@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     id                 INTEGER PRIMARY KEY,
     run_id             INTEGER,
     story_id           INTEGER,
-    role               TEXT    NOT NULL,   -- writer | editor
+    role               TEXT    NOT NULL,   -- writer | editor | translate
     model              TEXT    NOT NULL,
     prompt_tokens      INTEGER NOT NULL DEFAULT 0,
     completion_tokens  INTEGER NOT NULL DEFAULT 0,

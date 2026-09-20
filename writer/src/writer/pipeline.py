@@ -16,6 +16,7 @@ from .pack import build_pack, source_lines
 from .publish import ascii_slug, ingest_payload, normalize_tags, post_article, render_markdown, write_file
 from .publish import unescape_newlines
 from .settings import Settings
+from .translate import translate_comments
 
 log = logging.getLogger(__name__)
 
@@ -154,6 +155,21 @@ def _has_article_source(hits: list[Hit]) -> bool:
     return any(h.role != "community" for h in hits)
 
 
+def _translate_sources(conn: Conn, settings: Settings, chat: OpenRouterChat, sources: list[dict],
+                       *, story_id: int, run_id: int | None) -> None:
+    """커뮤니티 댓글을 한국어로 바꿔 넣는다. 실패하면 원문이 남고 발행은 계속된다."""
+    for src in sources:
+        comments = src.get("comments") or []
+        if not comments:
+            continue
+        src["comments"] = translate_comments(
+            chat, comments, model=settings.writer_model,
+            on_result=lambda r: store.insert_usage(
+                conn, run_id=run_id, story_id=story_id, role="translate", result=r,
+            ),
+        )
+
+
 def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
                 story_id: int, run_id: int | None,
                 prompts: dict, pver: str) -> Path | None:
@@ -166,6 +182,7 @@ def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
     cluster = _hits_to_cluster(hits)
     pack = build_pack(cluster)
     sources = source_lines(hits)
+    _translate_sources(conn, settings, chat, sources, story_id=story_id, run_id=run_id)
 
     if st.status == "published":
         row = conn.execute(

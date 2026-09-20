@@ -12,13 +12,26 @@ import {
 } from "./layout.ts";
 import { commentSection, type CommentRow } from "./comments.ts";
 
-function communityQuotes(json: string): { author: string; text: string }[] {
-  const out: { author: string; text: string }[] = [];
+/**
+ * 커뮤니티 소스 이름을 표시용 짧은 라벨로 줄인다.
+ * `Reddit r/Games (top/day)` -> `r/Games`. 모양이 다르면 원문 그대로 둔다(표시 전용).
+ */
+export function communitySourceLabel(name: string | undefined): string {
+  const trimmed = name?.trim() ?? "";
+  const match = /^Reddit\s+(.+?)\s*\([^)]*\)$/.exec(trimmed);
+  return match ? match[1].trim() : trimmed;
+}
+
+function communityQuotes(
+  json: string,
+): { author: string; text: string; source: string }[] {
+  const out: { author: string; text: string; source: string }[] = [];
   for (const source of articleSources(json)) {
+    const label = communitySourceLabel(source.name);
     for (const row of source.comments || []) {
       const text = row.text?.trim();
       if (!text) continue;
-      out.push({ author: row.author?.trim() || "anon", text });
+      out.push({ author: row.author?.trim() || "anon", text, source: label });
       if (out.length >= 6) return out;
     }
   }
@@ -37,11 +50,26 @@ function communityBox(json: string) {
     >
       커뮤니티 반응
     </h2>
-    <ul class="space-y-2.5 text-body-sm font-body-sm text-on-surface-variant">
+    <ul class="space-y-2.5">
       ${quotes.map(
-    (q) => html`<li>
-          <span class="text-outline font-label-mono-sm">u/${q.author}</span>
-          <p class="mt-0.5 text-on-surface-variant">${q.text}</p>
+    (q) => html`<li
+          class="bg-surface-container-low border border-outline-variant rounded p-3.5"
+        >
+          <div class="flex flex-wrap items-center gap-2 min-w-0 mb-1.5">
+            <span class="text-label-ui font-label-ui font-semibold text-on-surface"
+              >u/${q.author}</span
+            >
+            ${q.source
+          ? html`<span class="text-label-mono-sm font-label-mono-sm text-outline"
+                    >${q.source}</span
+                  >`
+          : ""}
+          </div>
+          <p
+            class="text-body-sm font-body-sm text-on-surface-variant whitespace-pre-wrap break-words"
+          >
+            ${q.text}
+          </p>
         </li>`,
   )}
     </ul>
