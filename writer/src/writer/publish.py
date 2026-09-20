@@ -14,6 +14,45 @@ log = logging.getLogger(__name__)
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _LITERAL_NL = re.compile(r"\\n")
 
+MAX_TAGS = 3
+TAG_MAX_LEN = 20
+_TAG_SPLIT = re.compile(r"[,/]")
+_TAG_ALLOWED = re.compile(r"[^가-힣a-zA-Z0-9 ·+\-&_.:]")
+_TAG_SPACES = re.compile(r"\s+")
+
+
+def normalize_tags(value: object) -> list[str]:
+    """모델이 낸 태그를 웹 계약에 맞게 정리한다.
+
+    문자열이면 쉼표/`/`로 나눈다. 각 항목은 선행 `#` 제거 → 허용 문자만 남김
+    → 연속 공백 1칸 → 20자 컷 → trim. 2자 미만은 버리고, 대소문자 무시 중복은
+    먼저 나온 표기를 남긴다. 최대 3개.
+    """
+    if isinstance(value, str):
+        raw = _TAG_SPLIT.split(value)
+    elif isinstance(value, list):
+        raw = value
+    else:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().lstrip("#")
+        tag = _TAG_ALLOWED.sub("", tag)
+        tag = _TAG_SPACES.sub(" ", tag)[:TAG_MAX_LEN].strip()
+        if len(tag) < 2:
+            continue
+        key = tag.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(tag)
+        if len(out) >= MAX_TAGS:
+            break
+    return out
+
 
 def unescape_newlines(text: str) -> str:
     """모델이 JSON 문자열 안에서 \\n 을 두 번 이스케이프한 경우(리터럴 \\n) 실제 줄바꿈으로 되돌린다."""
@@ -28,7 +67,8 @@ def ascii_slug(title: str, fallback: str = "story") -> str:
 
 def render_markdown(*, story_id: int, slug: str, title: str, lede: str, body: str,
                     model: str, run_id: int | None, sources: list[dict],
-                    status: str, prompt_version: str) -> str:
+                    status: str, prompt_version: str,
+                    tags: list[str] | None = None) -> str:
     src_lines = []
     for s in sources:
         src_lines.append(f"  - name: {s['name']}\n    url: {s['url']}\n    role: {s['role']}")
@@ -43,6 +83,7 @@ def render_markdown(*, story_id: int, slug: str, title: str, lede: str, body: st
         f"model: {model}",
         f"run_id: {run_id or ''}",
         f"prompt_version: {prompt_version}",
+        *([f"tags: [{', '.join(tags)}]"] if tags is not None else []),
         "sources:",
         src_block,
         "---",
@@ -145,19 +186,18 @@ def _drop_lede_echo(body_md: str, lede: str) -> str:
 
 
 def ingest_payload(*, slug: str, title: str, lede: str, body_md: str,
-                   section: str, published_at: str, story_id: int,
-                   sources: list[dict]) -> dict:
+                   published_at: str, story_id: int,
+                   sources: list[dict], tags: list[str] | None = None) -> dict:
     from .db import utcnow
     lede = unescape_newlines(lede)
     body_md = unescape_newlines(body_md)
     body_md = _drop_lede_echo(body_md, lede)
     body_md = prose_body(body_md, sources)
-    return {
+    payload = {
         "slug": slug,
         "title_ko": title,
         "lede_ko": lede or "",
         "body_html": md_to_html(body_md),
-        "section": section or "",
         "published_at": published_at or utcnow(),
         "updated_at": utcnow(),
         "sources": [
@@ -171,3 +211,6 @@ def ingest_payload(*, slug: str, title: str, lede: str, body_md: str,
         ],
         "story_id": story_id,
     }
+    if tags is not None:
+        payload["tags"] = tags
+    return payload

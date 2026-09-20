@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { html, raw } from "hono/html";
 import { env, rootDir } from "../env.ts";
-import { SECTIONS, SECTION_LABELS, sectionLabel } from "../sections.ts";
+import { recentTags } from "../tagStore.ts";
 
 const FALLBACK_CSS = `body{background:#0f131d;color:#dfe2f1;font-family:Inter,sans-serif;margin:0}`;
 
@@ -23,11 +23,12 @@ export type ArticleRow = {
   title_ko: string;
   lede_ko: string;
   body_html: string;
-  section: string;
   published_at: string;
   updated_at: string;
   story_id: number | null;
   sources_json: string;
+  /** 태그를 붙인 조회 결과에만 채워진다(RSS 등은 비어 있음). */
+  tags?: string[];
 };
 
 export type Source = {
@@ -138,20 +139,18 @@ export function sourceBadges(json: string) {
   });
 }
 
-/** 섹션 태그. 매핑에 없는 섹션은 라벨 없이 원문 태그만 보여준다. */
-export function sectionTag(section: string) {
-  const tag = section.trim();
-  if (!tag) return "";
-  const label = sectionLabel(tag);
-  const name = tag.startsWith("#") ? tag : `#${tag}`;
+/** 태그 칩 묶음. 각 칩은 피드 태그 필터(/?tag=)로 링크한다. */
+export function tagChips(tags: string[]) {
+  const list = tags.filter((tag) => tag.trim() !== "");
+  if (list.length === 0) return "";
   return html`<div class="flex flex-wrap items-center gap-1.5 mt-2">
-    <span
-      class="px-2 py-0.5 rounded text-label-mono-sm font-label-mono-sm bg-surface-variant text-primary font-medium"
-      >${name}</span
-    >
-    ${label
-      ? html`<span class="text-label-ui font-label-ui text-on-surface-variant">${label}</span>`
-      : ""}
+    ${list.map(
+    (tag) => html`<a
+        class="px-2 py-0.5 rounded text-label-mono-sm font-label-mono-sm bg-surface-variant text-primary hover:font-medium"
+        href="/?tag=${encodeURIComponent(tag)}"
+        >#${tag}</a
+      >`,
+  )}
   </div>`;
 }
 
@@ -191,7 +190,7 @@ export function summaryBox(lede: string) {
   </div>`;
 }
 
-export type NavCurrent = "feed" | "article" | "search" | "none";
+export type NavCurrent = "feed" | "article" | "search" | "tags" | "none";
 
 function navLink(
   href: string,
@@ -207,10 +206,10 @@ function navLink(
 
 function siteHeader(options: {
   current: NavCurrent;
-  section: string;
+  activeTag: string;
   q: string;
 }) {
-  const activeSection = options.section;
+  const activeTag = options.activeTag;
   const searching = options.current === "search";
   // 검색 페이지에서만 htmx를 붙인다. 다른 페이지에는 #search-results가 없다.
   const formHx = searching
@@ -245,15 +244,15 @@ function siteHeader(options: {
             >
           </div>
         </a>
-        <nav class="hidden lg:flex items-center gap-6" aria-label="섹션">
-          ${navLink("/", "전체", options.current === "feed" && !activeSection)}
-          ${SECTIONS.map((section) =>
+        <nav class="hidden lg:flex items-center gap-6" aria-label="태그">
+          ${recentTags().map((tag) =>
     navLink(
-      `/?section=${section}`,
-      SECTION_LABELS[section],
-      options.current === "feed" && activeSection === section,
+      `/?tag=${encodeURIComponent(tag)}`,
+      `#${tag}`,
+      options.current === "feed" && activeTag === tag,
     ),
   )}
+          ${navLink("/tags", "전체보기", options.current === "tags")}
           ${navLink("/rss.xml", "RSS", false)}
         </nav>
       </div>
@@ -281,8 +280,8 @@ function siteHeader(options: {
             aria-label="기사 검색"
             ${raw(inputHx)}
           />
-          ${activeSection
-            ? html`<input type="hidden" name="section" value="${activeSection}" />`
+          ${activeTag
+            ? html`<input type="hidden" name="tag" value="${activeTag}" />`
             : ""}
           <div
             class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none"
@@ -331,7 +330,8 @@ export function layout(options: {
   title: string;
   body: Html;
   current?: NavCurrent;
-  section?: string;
+  /** 피드에서 필터 중인 태그. 네비게이션에서 활성 표시에 쓴다. */
+  activeTag?: string;
   q?: string;
   description?: string;
   canonical?: string;
@@ -339,7 +339,7 @@ export function layout(options: {
   publishedTime?: string;
 }) {
   const current = options.current ?? "none";
-  const section = options.section ?? "";
+  const activeTag = options.activeTag ?? "";
   const q = options.q ?? "";
   const description = options.description?.trim() ?? "";
   const ogType = options.ogType ?? "website";
@@ -386,7 +386,7 @@ export function layout(options: {
       <body
         class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary"
       >
-        ${siteHeader({ current, section, q })}
+        ${siteHeader({ current, activeTag, q })}
         <main class="max-w-7xl mx-auto px-6 py-6 w-full flex-grow">
           <div class="max-w-4xl">${options.body}</div>
         </main>

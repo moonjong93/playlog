@@ -1,13 +1,12 @@
 import { html, raw } from "hono/html";
-import { SECTION_LABELS } from "../sections.ts";
 import {
   formatRelativeTime,
   formatTime,
   layout,
+  tagChips,
   type ArticleRow,
   type Html,
 } from "./layout.ts";
-import { sectionTabs } from "./feed.ts";
 
 export const QUERY_MAX = 100;
 export const QUERY_MIN = 2;
@@ -69,18 +68,11 @@ export function snippet(text: string, query: string, around = 60): Html | null {
 function resultItem(hit: SearchHit, query: string) {
   const href = `/s/${encodeURIComponent(hit.slug)}`;
   const body = snippet(hit.search_text || hit.body_html, query);
-  const label = hit.section ? SECTION_LABELS[hit.section as keyof typeof SECTION_LABELS] : "";
   return html`<article
     class="feed-card bg-surface-container-low border border-outline-variant rounded p-4 hover:border-primary/60 transition-all duration-150"
   >
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2 mb-1.5">
-        ${label
-      ? html`<span
-              class="px-2 py-0.5 rounded text-label-mono-sm font-label-mono-sm bg-surface-variant text-primary"
-              >${label}</span
-            >`
-      : ""}
         <time
           class="text-label-mono-sm font-label-mono-sm text-outline"
           datetime="${hit.published_at}"
@@ -97,6 +89,7 @@ function resultItem(hit: SearchHit, query: string) {
           >${highlight(hit.title_ko, query)}</a
         >
       </h2>
+      ${tagChips(hit.tags ?? [])}
       ${body
       ? html`<p class="mt-2 text-body-sm font-body-sm text-on-surface-variant">
           ${body}
@@ -106,21 +99,30 @@ function resultItem(hit: SearchHit, query: string) {
   </article>`;
 }
 
+function searchHref(q: string, tag: string): string {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (tag) params.set("tag", tag);
+  const query = params.toString();
+  return query ? `/search?${query}` : "/search";
+}
+
 /** /search 결과 파셜(#search-results 내부). */
 export function searchResults(options: {
   hits: SearchHit[];
   q: string;
-  section: string;
+  tag: string;
   notice?: string;
 }) {
-  const { hits, q, section } = options;
-  const hrefFor = (nextSection: string) => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (nextSection) params.set("section", nextSection);
-    const query = params.toString();
-    return query ? `/search?${query}` : "/search";
-  };
+  const { hits, q, tag } = options;
+  const activeTag = tag
+    ? html`<a
+        class="px-2 py-0.5 rounded text-label-mono-sm font-label-mono-sm bg-surface-variant text-primary font-semibold"
+        href="${searchHref(q, "")}"
+        title="태그 필터 해제"
+        >#${tag} ✕</a
+      >`
+    : "";
 
   const notice = options.notice
     ? html`<div
@@ -138,7 +140,7 @@ export function searchResults(options: {
 
   return html`<div class="flex flex-col gap-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      ${sectionTabs(section, hrefFor)}
+      <div class="flex flex-wrap items-center gap-1.5">${activeTag}</div>
       ${q ? html`<span class="text-label-mono-sm font-label-mono-sm text-outline">${hits.length}건</span>` : ""}
     </div>
     ${notice}
@@ -155,18 +157,18 @@ export function searchResults(options: {
 export function searchPage(options: {
   hits: SearchHit[];
   q: string;
-  section: string;
+  tag: string;
   notice?: string;
 }) {
   const params = new URLSearchParams();
   if (options.q) params.set("q", options.q);
-  if (options.section) params.set("section", options.section);
+  if (options.tag) params.set("tag", options.tag);
   const query = params.toString();
 
   return layout({
     title: options.q ? `${options.q} 검색 · Ludus Digest` : "검색 · Ludus Digest",
     current: "search",
-    section: options.section,
+    activeTag: options.tag,
     q: options.q,
     canonical: query ? `/search?${query}` : "/search",
     body: html`<div class="flex flex-col gap-5">

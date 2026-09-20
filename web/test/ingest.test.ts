@@ -10,7 +10,6 @@ const payload = {
   body_html:
     '<p>본문 <script>alert(1)</script><img src=x onerror=alert(1)>' +
     '<a href="javascript:alert(1)">js</a> <a href="https://example.com" title="t">ext</a></p>',
-  section: "테크",
   published_at: "2026-09-19T12:00:00+09:00",
   updated_at: "2026-09-19T12:00:00+09:00",
   story_id: 11,
@@ -26,7 +25,6 @@ const payload = {
 
 type Stored = {
   body_html: string;
-  section: string;
   search_text: string;
   title_ko: string;
   sources_json: string;
@@ -34,9 +32,17 @@ type Stored = {
 
 function stored(slug: string): Stored | undefined {
   return query<Stored>(
-    "SELECT body_html, section, search_text, title_ko, sources_json FROM articles WHERE slug = ?",
+    "SELECT body_html, search_text, title_ko, sources_json FROM articles WHERE slug = ?",
     [slug],
   )[0];
+}
+
+/** 저장 순서(rowid)대로 읽는다. */
+function tagsOf(slug: string): string[] {
+  return query<{ tag: string }>(
+    "SELECT tag FROM article_tags WHERE slug = ? ORDER BY rowid",
+    [slug],
+  ).map((row) => row.tag);
 }
 
 describe("POST /internal/articles", () => {
@@ -74,18 +80,8 @@ describe("POST /internal/articles", () => {
     expect(body).toContain('href="https://example.com"');
     expect(body).toContain('target="_blank"');
     expect(body).toContain('rel="noopener noreferrer"');
-  });
-
-  it("섹션을 화이트리스트로 정규화한다", async () => {
-    expect(stored("ingest-brief")?.section).toBe("");
     expect(stored("ingest-brief")?.search_text.length).toBeGreaterThan(0);
     expect(stored("ingest-brief")?.search_text).not.toContain("<");
-    const valid = await postInternal(
-      { ...payload, slug: "ingest-ship", section: "ship" },
-      API_KEY,
-    );
-    expect(valid.status).toBe(201);
-    expect(stored("ingest-ship")?.section).toBe("ship");
   });
 
   it("search_text로 검색이 된다", async () => {
@@ -107,6 +103,74 @@ describe("POST /internal/articles", () => {
       body: "{not json",
     });
     expect(res.status).toBe(400);
+  });
+
+  it("tags 배열을 정규화해 저장한다", async () => {
+    const res = await postInternal(
+      {
+        ...payload,
+        slug: "ingest-tags",
+        tags: ["#닌텐도", "닌텐도", "a", "TGS2026", "  스위치  ", "여섯번째", "일곱번째"],
+      },
+      API_KEY,
+    );
+    expect(res.status).toBe(201);
+    expect(tagsOf("ingest-tags")).toEqual([
+      "닌텐도",
+      "TGS2026",
+      "스위치",
+      "여섯번째",
+      "일곱번째",
+    ]);
+  });
+
+  it("tags 키가 없으면 기존 태그를 유지한다", async () => {
+    const before = tagsOf("ingest-tags");
+    const res = await postInternal(
+      { ...payload, slug: "ingest-tags", title_ko: "태그 유지" },
+      API_KEY,
+    );
+    expect(res.status).toBe(200);
+    expect(tagsOf("ingest-tags")).toEqual(before);
+  });
+
+  it("tags: []는 태그를 비운다", async () => {
+    const res = await postInternal({ ...payload, slug: "ingest-tags", tags: [] }, API_KEY);
+    expect(res.status).toBe(200);
+    expect(tagsOf("ingest-tags")).toEqual([]);
+  });
+
+  it("배열이 아닌 tags는 400", async () => {
+    for (const bad of ["닌텐도", 5, null, { tag: "닌텐도" }]) {
+      const res = await postInternal({ ...payload, slug: "ingest-bad", tags: bad }, API_KEY);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "tags must be an array" });
+    }
+    expect(stored("ingest-bad")).toBeUndefined();
+  });
+
+  it("레거시 section은 태그 1개로 변환한다", async () => {
+    const created = await postInternal(
+      { ...payload, slug: "ingest-legacy", section: "ship" },
+      API_KEY,
+    );
+    expect(created.status).toBe(201);
+    expect(tagsOf("ingest-legacy")).toEqual(["출시·패치"]);
+
+    // 기존 태그가 있어도 레거시 section이 오면 그 태그로 교체된다.
+    await postInternal({ ...payload, slug: "ingest-legacy", tags: ["닌텐도"] }, API_KEY);
+    expect(tagsOf("ingest-legacy")).toEqual(["닌텐도"]);
+    await postInternal({ ...payload, slug: "ingest-legacy", section: "announce" }, API_KEY);
+    expect(tagsOf("ingest-legacy")).toEqual(["발표·신작"]);
+  });
+
+  it("매핑에 없는 section은 무시한다", async () => {
+    const res = await postInternal(
+      { ...payload, slug: "ingest-legacy-unknown", section: "테크" },
+      API_KEY,
+    );
+    expect(res.status).toBe(201);
+    expect(tagsOf("ingest-legacy-unknown")).toEqual([]);
   });
 
   it("DELETE /internal/comments/:id는 운영 삭제용", async () => {

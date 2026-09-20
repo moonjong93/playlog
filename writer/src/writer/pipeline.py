@@ -13,7 +13,7 @@ from .db import Conn, consumed_ids, iso_days_ago, iso_hours_ago, load_batch, loa
 from .llm import OpenRouterChat
 from .models import Cluster, Hit, Prepared, StoryRow
 from .pack import build_pack, source_lines
-from .publish import ascii_slug, ingest_payload, post_article, render_markdown, write_file
+from .publish import ascii_slug, ingest_payload, normalize_tags, post_article, render_markdown, write_file
 from .publish import unescape_newlines
 from .settings import Settings
 
@@ -158,7 +158,7 @@ def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
         if row is None:
             raise RuntimeError(f"story {story_id} 의 기사가 없다")
         title, lede, body, model_name = row["title_ko"], row["lede_ko"], row["body_md"], row["model"]
-        section = ""
+        tags: list[str] | None = None  # 재발행: 웹이 기존 태그를 유지한다
     else:
         w = run_writer(
             chat, prompts, pack,
@@ -170,7 +170,7 @@ def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
         title = unescape_newlines(str(w.data.get("title_ko") or "")).strip()
         lede = unescape_newlines(str(w.data.get("lede_ko") or "")).strip()
         body = unescape_newlines(str(w.data.get("body_md") or "")).strip()
-        section = str(w.data.get("section") or "").strip()
+        tags = normalize_tags(w.data.get("tags"))
         if not title or not body:
             raise RuntimeError(f"writer 응답 필드 부족: {w.data!r}"[:300])
         store.insert_article(
@@ -184,14 +184,14 @@ def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
     text = render_markdown(
         story_id=story_id, slug=slug, title=title, lede=lede, body=body,
         model=model_name, run_id=run_id, sources=sources, status="published",
-        prompt_version=pver,
+        prompt_version=pver, tags=tags,
     )
     path = write_file(settings.out_dir, date=date, slug=slug, text=text)
     store.update_story_status(conn, story_id, "published", title_ko=title, lede_ko=lede)
     if settings.web_url:
         payload = ingest_payload(
             slug=slug, title=title, lede=lede, body_md=body,
-            section=section,
+            tags=tags,
             published_at=utcnow(), story_id=story_id, sources=sources,
         )
         try:

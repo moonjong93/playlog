@@ -5,13 +5,15 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { html } from "hono/html";
-import { query, queryOne, run } from "./db.ts";
+import { query, queryOne, run, transaction } from "./db.ts";
 import { env, isRateLimitDisabled, rootDir } from "./env.ts";
 import { clientIp, consume, hashIp } from "./ratelimit.ts";
 import { ensureSession } from "./session.ts";
 import { sanitizeBodyHtml, toSearchText } from "./sanitize.ts";
-import { normalizeSection } from "./sections.ts";
+import { LEGACY_SECTION_TAGS, normalizeTags } from "./tags.ts";
+import { allTags, replaceTags, tagTotal, tagsFor } from "./tagStore.ts";
 import { PAGE_SIZE, feedPage } from "./pages/feed.ts";
+import { tagsPage } from "./pages/tags.ts";
 import { articlePage } from "./pages/article.ts";
 import {
   QUERY_MAX,
@@ -46,7 +48,7 @@ type AppEnv = { Variables: { ip: string; sid: string } };
 
 export const app = new Hono<AppEnv>();
 
-const ARTICLE_COLUMNS = `slug, title_ko, lede_ko, body_html, section,
+const ARTICLE_COLUMNS = `slug, title_ko, lede_ko, body_html,
   published_at, updated_at, story_id, sources_json`;
 
 const COMMENT_COLUMNS = "id, nickname, body, session_id, created_at";
@@ -85,7 +87,14 @@ function likePattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
-function searchHits(q: string, section: string): SearchHit[] {
+/** 조회한 기사들에 태그를 붙인다(쿼리 1회). */
+function withTags<T extends { slug: string }>(rows: T[]): (T & { tags: string[] })[] {
+  if (rows.length === 0) return [];
+  const bySlug = tagsFor(rows.map((row) => row.slug));
+  return rows.map((row) => ({ ...row, tags: bySlug.get(row.slug) ?? [] }));
+}
+
+function searchHits(q: string, tag: string): SearchHit[] {
   const pattern = likePattern(q);
   const params: unknown[] = [pattern, pattern, pattern, pattern, pattern, pattern];
   let sql = `SELECT ${ARTICLE_COLUMNS}, search_text,
@@ -101,9 +110,10 @@ function searchHits(q: string, section: string): SearchHit[] {
       OR lede_ko LIKE ? ESCAPE '\\'
       OR search_text LIKE ? ESCAPE '\\'
     )`;
-  if (section) {
-    sql += " AND section = ?";
-    params.push(section);
+  if (tag) {
+    sql +=
+      " AND EXISTS (SELECT 1 FROM article_tags t WHERE t.slug = articles.slug AND t.tag = ?)";
+    params.push(tag);
   }
   sql += " ORDER BY rank DESC, published_at DESC LIMIT 20";
   return query<SearchHit>(sql, params);
@@ -198,11 +208,13 @@ app.use("*", async (c, next) => {
 app.get("/health", (c) => c.text("ok"));
 
 app.get("/", (c) => {
-  const section = normalizeSection(c.req.query("section") ?? "");
+  const tag = (c.req.query("tag") ?? "").trim();
   const rawPage = Number(c.req.query("page") ?? "1");
   const page = Number.isInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 10_000) : 1;
-  const where = section ? "WHERE section = ?" : "";
-  const filter = section ? [section] : [];
+  const where = tag
+    ? "WHERE EXISTS (SELECT 1 FROM article_tags t WHERE t.slug = articles.slug AND t.tag = ?)"
+    : "";
+  const filter = tag ? [tag] : [];
   const total =
     queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM articles ${where}`, filter)?.n ?? 0;
   const articles = query<ArticleRow>(
@@ -210,17 +222,30 @@ app.get("/", (c) => {
      ORDER BY published_at DESC LIMIT ? OFFSET ?`,
     [...filter, PAGE_SIZE, (page - 1) * PAGE_SIZE],
   );
-  return c.html(feedPage({ articles, section, page, total }));
+  return c.html(feedPage({ articles: withTags(articles), tag, page, total }));
+});
+
+app.get("/tags", (c) => {
+  const rawPage = Number(c.req.query("page") ?? "1");
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 10_000) : 1;
+  return c.html(
+    tagsPage({
+      tags: allTags(page),
+      page,
+      total: tagTotal(),
+      activeTag: (c.req.query("tag") ?? "").trim(),
+    }),
+  );
 });
 
 app.get("/search", (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, QUERY_MAX);
-  const section = normalizeSection(c.req.query("section") ?? "");
+  const tag = (c.req.query("tag") ?? "").trim();
   let notice: string | undefined;
   if (q.length === 0) notice = "검색어를 입력하세요.";
   else if (q.length < QUERY_MIN) notice = `${QUERY_MIN}자 이상 입력해 주세요.`;
-  const hits = notice ? [] : searchHits(q, section);
-  const options = { hits, q, section, notice };
+  const hits = notice ? [] : withTags(searchHits(q, tag));
+  const options = { hits, q, tag, notice };
   return c.html(wantsPartial(c) ? searchResults(options) : searchPage(options));
 });
 
@@ -233,7 +258,7 @@ app.get("/s/:slug", (c) => {
   if (!article) return c.html(notFoundPage(), 404);
   return c.html(
     articlePage({
-      article,
+      article: withTags([article])[0],
       comments: commentsFor(slug),
       commentCount: commentTotal(slug),
       sessionId: c.get("sid"),
@@ -443,6 +468,12 @@ function asStoryId(value: unknown): number | null {
   return null;
 }
 
+/** 레거시 section → 태그 1개. 매핑에 없으면 null(기존 태그 유지). */
+function legacyTag(value: unknown): string[] | null {
+  const tag = LEGACY_SECTION_TAGS[asString(value)?.trim() ?? ""];
+  return tag ? [tag] : null;
+}
+
 function normalizeComments(value: unknown): { author: string; text: string }[] {
   if (!Array.isArray(value)) return [];
   const out: { author: string; text: string }[] = [];
@@ -503,55 +534,65 @@ app.post("/internal/articles", async (c) => {
 
   const body_html = sanitizeBodyHtml(raw_body_html);
   const lede_ko = asString(input.lede_ko) ?? "";
-  const section = normalizeSection(asString(input.section) ?? "");
   const story_id = asStoryId(input.story_id);
   const sources_json = JSON.stringify(normalizeSources(input.sources));
   const search_text = toSearchText(body_html);
+
+  // tags 키가 없으면 기존 태그를 유지한다. 레거시 section은 태그 1개로 변환한다.
+  const hasTags = Object.hasOwn(input, "tags");
+  if (hasTags && !Array.isArray(input.tags)) {
+    return c.json({ error: "tags must be an array" }, 400);
+  }
+  const tags = hasTags ? normalizeTags(input.tags) : legacyTag(input.section);
 
   const existing = query<{ slug: string }>(
     "SELECT slug FROM articles WHERE slug = ?",
     [slug],
   );
   if (existing.length > 0) {
+    transaction(() => {
+      run(
+        `UPDATE articles SET
+          title_ko = ?, lede_ko = ?, body_html = ?,
+          published_at = ?, updated_at = ?, story_id = ?, sources_json = ?, search_text = ?
+        WHERE slug = ?`,
+        [
+          title_ko,
+          lede_ko,
+          body_html,
+          published_at,
+          updated_at,
+          story_id,
+          sources_json,
+          search_text,
+          slug,
+        ],
+      );
+      if (tags !== null) replaceTags(slug, tags);
+    });
+    return c.json({ ok: true, slug }, 200);
+  }
+
+  transaction(() => {
     run(
-      `UPDATE articles SET
-        title_ko = ?, lede_ko = ?, body_html = ?, section = ?,
-        published_at = ?, updated_at = ?, story_id = ?, sources_json = ?, search_text = ?
-      WHERE slug = ?`,
+      `INSERT INTO articles (
+        slug, title_ko, lede_ko, body_html,
+        published_at, updated_at, story_id, sources_json, search_text
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        slug,
         title_ko,
         lede_ko,
         body_html,
-        section,
         published_at,
         updated_at,
         story_id,
         sources_json,
         search_text,
-        slug,
       ],
     );
-    return c.json({ ok: true, slug }, 200);
-  }
-
-  run(
-    `INSERT INTO articles (
-      slug, title_ko, lede_ko, body_html, section,
-      published_at, updated_at, story_id, sources_json, search_text
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      slug,
-      title_ko,
-      lede_ko,
-      body_html,
-      section,
-      published_at,
-      updated_at,
-      story_id,
-      sources_json,
-      search_text,
-    ],
-  );
+    if (tags !== null) replaceTags(slug, tags);
+  });
   return c.json({ ok: true, slug }, 201);
 });
 

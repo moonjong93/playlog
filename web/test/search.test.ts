@@ -6,20 +6,20 @@ beforeAll(() => {
     slug: "title-hit",
     title: "TGS 2026 특별 시연",
     body: "<p>제목에만 매치가 있다.</p>",
-    section: "announce",
+    tags: ["발표·신작"],
   });
   insertArticle({
     slug: "lede-hit",
     title: "요약 매치 기사",
     lede: "TGS 현장 요약 한 줄.",
     body: "<p>요약에 매치가 있다.</p>",
-    section: "ship",
+    tags: ["출시·패치"],
   });
   insertArticle({
     slug: "body-hit",
     title: "본문 매치 기사",
     body: "<p>본문에만 TGS 이야기가 들어 있다.</p>",
-    section: "talk",
+    tags: ["발언"],
   });
   insertArticle({
     slug: "escape-hit",
@@ -94,10 +94,27 @@ describe("GET /search", () => {
     expect(feed).not.toContain("hx-trigger=");
   });
 
-  it("검색 결과도 섹션 필터를 따른다", async () => {
-    const html = await (await app.request("/search?q=TGS&section=ship")).text();
+  it("검색 결과도 태그 필터를 따른다", async () => {
+    const tag = encodeURIComponent("출시·패치");
+    const html = await (await app.request(`/search?q=TGS&tag=${tag}`)).text();
     expect(html).toContain("요약 매치 기사");
     expect(html).not.toContain("TGS 2026 특별 시연");
+    // 활성 태그 칩에는 해제 링크가 붙는다.
+    expect(html).toContain(`href="/search?q=TGS"`);
+  });
+
+  it("검색 결과 카드에 태그 칩이 나온다", async () => {
+    const html = await (await app.request("/search?q=TGS")).text();
+    expect(html).toContain(`href="/?tag=${encodeURIComponent("출시·패치")}"`);
+  });
+
+  it("?section= 은 검색에서도 무시된다", async () => {
+    const all = await (await app.request("/search?q=TGS")).text();
+    const sectioned = await (await app.request("/search?q=TGS&section=ship")).text();
+    expect(sectioned).toContain("2026 특별 시연");
+    expect(sectioned).toContain("요약 매치 기사");
+    expect(sectioned).toContain("3건");
+    expect(all).toContain("3건");
   });
 
   it("escape 후 mark만 삽입한다", async () => {

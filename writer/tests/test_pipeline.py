@@ -107,3 +107,36 @@ def test_write_story_publishes_markdown(conn, tmp_path):
     roles = [r["role"] for r in conn.execute("SELECT role FROM llm_usage ORDER BY id")]
     assert roles == ["writer"]
     assert calls["n"] == 1
+
+
+def test_write_story_sends_tags_and_republish_omits_them(conn, tmp_path, monkeypatch):
+    ign = add_source(conn, "IGN", weight=1.5)
+    add_item(conn, ign, "Official launch", desc="x" * 250, vec=v(1, 0, 0, 0))
+    s = make_settings(tmp_path, web_url="https://web.example", web_api_key="k")
+    run_once(conn, s, write=False)
+    sid = conn.execute("SELECT id FROM stories").fetchone()["id"]
+
+    def handler(request):
+        payload = {
+            "title_ko": "공식 출시", "lede_ko": "오늘 나왔다.", "body_md": "본문이다.",
+            "tags": ["닌텐도", "닌텐도", "#TGS2026!!", "가"],
+        }
+        return httpx.Response(200, json={
+            "id": "gen-1",
+            "model": "test/writer",
+            "choices": [{"message": {"content": json.dumps(payload, ensure_ascii=False)}}],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 8},
+        })
+
+    sent: list[dict] = []
+    monkeypatch.setattr("writer.pipeline.post_article", lambda url, key, payload: sent.append(payload) or 201)
+    chat = _chat(handler)
+    prompts, pver = load_prompts(PROMPTS), prompt_version(PROMPTS)
+
+    path = write_story(conn, s, chat, story_id=sid, run_id=None, prompts=prompts, pver=pver)
+    assert sent[0]["tags"] == ["닌텐도", "TGS2026"]
+    assert "tags: [닌텐도, TGS2026]" in path.read_text(encoding="utf-8")
+
+    write_story(conn, s, chat, story_id=sid, run_id=None, prompts=prompts, pver=pver)
+    assert len(sent) == 2
+    assert "tags" not in sent[1]  # 재발행: 웹이 기존 태그를 유지한다

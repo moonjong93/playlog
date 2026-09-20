@@ -26,8 +26,9 @@ writer:
     - 출처는 body_md 에 쓰지 않는다. 링크 나열, '출처:' 줄, 매체명 bullet 모두 금지. 출처는 별도 필드로 이미 간다.
 
     출력은 JSON 객체 하나만:
-    {"title_ko":"...","lede_ko":"줄1\\n줄2","body_md":"마크다운","section":"industry|announce|ship|talk|review"}
-    section: industry=스튜디오/해고/사업, announce=신작·TGS 발표, ship=출시·패치, talk=공식 아닌 발언, review=리뷰·공략.
+    {"title_ko":"...","lede_ko":"줄1\\n줄2","body_md":"마크다운","tags":["태그1","태그2"]}
+    tags: 기사당 1~3개. 한국어 2~12자(영문·숫자 허용). 회사·플랫폼·장르·행사 이름을 널리 쓰는 말로 고른다.
+    조사가 붙은 말("닌텐도가"✗)과 문장은 쓰지 않는다. 기사마다 새 태그를 만들지 않는다.
   user: |
     아래 소스팩만 근거로 한국어 기사를 써라.
     문장은 한국어. 로마자 게임 이름만 소스팩 표기 그대로.

@@ -7,7 +7,7 @@ beforeAll(() => {
     insertArticle({
       slug: `page-${n}`,
       title: `페이지 기사 ${n}`,
-      section: i <= 3 ? "ship" : "announce",
+      tags: [i <= 3 ? "출시·패치" : "발표·신작"],
       publishedAt: new Date(Date.UTC(2026, 8, 20, 0, 0, 0) - i * 60_000).toISOString(),
     });
   }
@@ -17,6 +17,12 @@ afterAll(() => cleanup());
 
 function cards(html: string): string[] {
   return html.match(/class="feed-card/g) ?? [];
+}
+
+function headerNav(html: string): string {
+  const start = html.indexOf('aria-label="태그"');
+  const end = html.indexOf("</nav>", start);
+  return html.slice(start, end);
 }
 
 describe("피드/기사", () => {
@@ -43,22 +49,38 @@ describe("피드/기사", () => {
     expect(html).toContain(">다음<");
   });
 
-  it("섹션 필터가 동작한다", async () => {
-    const html = await (await app.request("/?section=ship")).text();
+  it("태그 필터가 동작한다", async () => {
+    const html = await (await app.request(`/?tag=${encodeURIComponent("출시·패치")}`)).text();
     expect(cards(html).length).toBe(3);
     expect(html).toContain("페이지 기사 01");
     expect(html).not.toContain("페이지 기사 04");
 
-    const other = await (await app.request("/?section=review")).text();
+    const other = await (await app.request(`/?tag=${encodeURIComponent("리뷰·공략")}`)).text();
     expect(cards(other).length).toBe(0);
-    expect(other).toContain("아직 기사가 없습니다");
+    expect(other).toContain("태그의 기사가 없습니다");
+    expect(other).toContain("0건");
   });
 
-  it("섹션 탭은 전체 + 5개 섹션", async () => {
+  it("?section= 은 더 이상 필터가 아니다", async () => {
+    const all = await (await app.request("/")).text();
+    const sectioned = await (await app.request("/?section=ship")).text();
+    expect(cards(sectioned).length).toBe(cards(all).length);
+    expect(sectioned).toContain("25건");
+  });
+
+  it("카드 칩은 /?tag= 로 링크한다", async () => {
     const html = await (await app.request("/")).text();
-    for (const label of ["전체", "업계·사업", "발표·신작", "출시·패치", "발언", "리뷰·공략"]) {
-      expect(html).toContain(label);
-    }
+    expect(html).toContain(`href="/?tag=${encodeURIComponent("출시·패치")}"`);
+  });
+
+  it("네비는 최근 태그와 전체보기 링크다", async () => {
+    const html = await (await app.request("/")).text();
+    const nav = headerNav(html);
+    expect(nav).toContain("#출시·패치");
+    expect(nav).toContain("#발표·신작");
+    expect(nav).toContain('href="/tags"');
+    expect(nav).toContain("전체보기");
+    expect(nav).not.toContain("?section=");
   });
 
   it("없는 기사는 404 안내", async () => {
@@ -73,5 +95,11 @@ describe("피드/기사", () => {
     expect(html).toContain('<meta property="og:type" content="article" />');
     expect(html).toContain('<meta property="article:published_time"');
     expect(html).toContain('<link rel="canonical" href="/s/page-01" />');
+  });
+
+  it("태그 피드 canonical에 태그가 들어간다", async () => {
+    const hash = encodeURIComponent("출시·패치");
+    const html = await (await app.request(`/?tag=${hash}`)).text();
+    expect(html).toContain(`<link rel="canonical" href="/?tag=${hash}" />`);
   });
 });

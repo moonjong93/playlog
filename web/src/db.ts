@@ -33,6 +33,11 @@ export function exec(sql: string): void {
   sqlite.exec(sql);
 }
 
+/** 여러 쓰기를 하나의 트랜잭션으로 묶는다. */
+export function transaction<T>(fn: () => T): T {
+  return sqlite.transaction(fn)();
+}
+
 /** 테스트 정리용. 앱 런타임에서는 호출하지 않는다. */
 export function close(): void {
   sqlite.close();

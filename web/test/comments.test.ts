@@ -15,7 +15,7 @@ import {
 const SLUG = "comment-target";
 
 beforeAll(() => {
-  insertArticle({ slug: SLUG, title: "댓글 대상 기사", section: "announce" });
+  insertArticle({ slug: SLUG, title: "댓글 대상 기사", tags: ["발표·신작"] });
 });
 
 beforeEach(() => {

@@ -5,9 +5,9 @@ import {
   formatTime,
   groupSources,
   layout,
-  sectionTag,
   sourceBadges,
   summaryBox,
+  tagChips,
   type ArticleRow,
 } from "./layout.ts";
 import { commentSection, type CommentRow } from "./comments.ts";
@@ -124,7 +124,6 @@ export function articlePage(options: {
     ogType: "article",
     publishedTime: article.published_at,
     current: "article",
-    section: article.section,
     body: html`<article>
       <div class="flex flex-wrap items-center gap-2 mb-3">
         ${sourceBadges(article.sources_json)}
@@ -140,7 +139,7 @@ export function articlePage(options: {
       >
         ${article.title_ko}
       </h1>
-      ${sectionTag(article.section)} ${summaryBox(article.lede_ko)}
+      ${tagChips(article.tags ?? [])} ${summaryBox(article.lede_ko)}
       <div class="article-body mt-8">
         ${raw(article.body_html)}
       </div>

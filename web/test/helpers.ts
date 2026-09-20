@@ -64,7 +64,7 @@ export function insertArticle(options: {
   title?: string;
   lede?: string;
   body?: string;
-  section?: string;
+  tags?: string[];
   publishedAt?: string;
   sources?: unknown[];
 }): void {
@@ -73,15 +73,14 @@ export function insertArticle(options: {
   const published = options.publishedAt ?? "2026-09-19T12:00:00+09:00";
   run(
     `INSERT INTO articles (
-      slug, title_ko, lede_ko, body_html, section,
+      slug, title_ko, lede_ko, body_html,
       published_at, updated_at, story_id, sources_json, search_text
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       options.slug,
       title,
       options.lede ?? "",
       body,
-      options.section ?? "",
       published,
       published,
       null,
@@ -89,6 +88,12 @@ export function insertArticle(options: {
       toSearchText(body),
     ],
   );
+  for (const tag of options.tags ?? []) {
+    run("INSERT OR IGNORE INTO article_tags (slug, tag) VALUES (?, ?)", [
+      options.slug,
+      tag,
+    ]);
+  }
 }
 
 export function countArticles(): number {

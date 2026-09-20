@@ -11,7 +11,7 @@ beforeAll(() => {
     slug: "tgs-2026-report",
     title: "TGS 2026 현장 리포트",
     lede: "도쿄 게임쇼 첫날 풍경.",
-    section: "announce",
+    tags: ["발표·신작"],
     sources: [
       {
         name: "Famitsu",
@@ -25,7 +25,7 @@ beforeAll(() => {
     slug: "indie-ship",
     title: "인디 게임 정식 출시",
     body: "<p>오늘 정식 출시되었다.</p>",
-    section: "ship",
+    tags: ["출시·패치"],
   });
 });
 
@@ -44,7 +44,7 @@ describe("공개 읽기", () => {
     expect((await app.request("/search?q=TGS")).status).toBe(200);
   });
 
-  it("기사 상세에 출처/커뮤니티 인용/요약 박스가 그대로 나온다", async () => {
+  it("기사 상세에 출처/커뮤니티 인용/요약 박스/태그 칩이 그대로 나온다", async () => {
     const html = await (await app.request("/s/tgs-2026-report")).text();
     expect(html).toContain("커뮤니티 반응");
     expect(html).toContain("u/neogaf_user");
@@ -52,12 +52,14 @@ describe("공개 읽기", () => {
     expect(html).toContain("summary-box");
     expect(html).toContain("Famitsu");
     expect(html).toContain('lang="ko"');
+    expect(html).toContain(`href="/?tag=${encodeURIComponent("발표·신작")}"`);
   });
 
   it("목록 카드에 출처 배지가 다시 보인다", async () => {
     const html = await (await app.request("/")).text();
     expect(html).toContain("feed-card");
     expect(html).toContain("Famitsu");
+    expect(html).toContain(`href="/?tag=${encodeURIComponent("출시·패치")}"`);
   });
 
   it("?key= 쿼리는 인증 경로가 아니고 링크에도 남지 않는다", async () => {
