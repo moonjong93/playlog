@@ -80,6 +80,19 @@ curl -sS -X POST http://127.0.0.1:8787/internal/articles \
 
 - 카드 생성은 `satori`(HTML→SVG) + `@resvg/resvg-js`(SVG→PNG)로 한다. 슬러그+수정시각을 키로 메모리에 캐시(최대 200장)하고, 같은 URL 동시 요청은 한 번만 렌더한다. 응답은 `Cache-Control: public, max-age=86400`.
 - 폰트는 `assets/fonts/*.ttf.gz`(Gzip)에 둔 서브셋이다. Noto Sans KR(OFL)에서 한글 음절·가나·기호 + 라틴, JetBrains Mono(OFL)에서 라틴을 남겼다. 라이선스 원문은 같은 디렉터리의 `OFL-*.txt`. 폰트를 바꿀 때는 두 파일을 같은 이름으로 교체하면 된다.
+
+```bash
+# 서브셋 재생성(예: Noto Sans KR). 커밋된 파일은 아래 절차로 만들었다.
+pip install fonttools brotli
+curl -LO https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf
+UNICODES="U+0020-007E,U+00A0-00FF,U+2010-2027,U+2030-205E,U+20A0-20BF,U+2190-21FF,U+2200-22FF,U+25A0-25FF,U+2713,U+3000-303F,U+3040-30FF,U+3131-318E,U+1100-11FF,U+AC00-D7A3,U+FF01-FF60,U+FFE0-FFE6"
+for W in 400 700; do
+  fonttools varLib.instancer "NotoSansKR[wght].ttf" wght=$W -o "inst-$W.ttf"
+  pyftsubset "inst-$W.ttf" --unicodes="$UNICODES" --no-hinting \
+    --drop-tables+=DSIG --layout-features='' --output-file="NotoSansKR-$W.ttf"
+  gzip -9 -c "NotoSansKR-$W.ttf" > "NotoSansKR-$W.ttf.gz"
+done
+```
 - 구조화 데이터(JSON-LD): 모든 페이지에 `WebSite` + `Organization`, 기사에 `NewsArticle`(제목·요약·이미지·발행/수정 시각·태그·댓글 수), 피드에 `ItemList`. 전부 `<`를 이스케이프해 `</script>`로 끊기지 않게 한다.
 - 검색 페이지는 `noindex, follow`, 나머지는 `max-image-preview:large, max-snippet:-1`(+ canonical, og/twitter 카드, `rel=prev/next`). 기사 하단의 "관련 기사"는 같은 태그를 많이 공유하는 순으로 붙는다(내부 링크).
 - `og:image`·canonical·sitemap 은 `SITE_URL` 이 있으면 그 값, 없으면 요청의 origin 을 쓴다. 운영에서는 도메인 고정을 위해 `SITE_URL` 을 채우는 걸 권한다.
