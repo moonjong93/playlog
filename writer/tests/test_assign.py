@@ -20,8 +20,10 @@ def _cluster(conn, threshold=0.72):
 def test_two_sources_with_material_write(conn):
     a = add_source(conn, "IGN", weight=1.0)
     b = add_source(conn, "Gematsu", weight=1.0)
-    add_item(conn, a, "A", desc="x" * 250, vec=v(1, 0, 0, 0))
-    add_item(conn, b, "B", desc="y" * 250, vec=v(0.98, 0.1, 0, 0))
+    add_item(conn, a, "Persona 4 Revival trailer",
+             desc="Persona 4 Revival trailer is out now. " + "x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, b, "Persona 4 Revival remake",
+             desc="Persona 4 Revival remake plans confirmed. " + "y" * 250, vec=v(0.98, 0.1, 0, 0))
     c = _cluster(conn)[0]
     ok, reason = should_write(c, min_weight=1.0, min_desc=200)
     assert ok and reason is None
@@ -50,7 +52,8 @@ def test_short_singleton_is_skipped(conn):
 
 def test_long_official_singleton_writes(conn):
     a = add_source(conn, "PlayStation Blog", weight=1.5)
-    add_item(conn, a, "Launch", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, a, "Monster Hunter Wilds launch",
+             desc="Monster Hunter Wilds launch is today. " + "x" * 250, vec=v(1, 0, 0, 0))
     c = _cluster(conn)[0]
     ok, reason = should_write(c, min_weight=1.0, min_desc=200)
     assert ok and reason is None
@@ -87,7 +90,8 @@ def test_high_similarity_is_merge(conn):
 
 def test_mid_similarity_is_related_new_story(conn):
     a = add_source(conn, "IGN")
-    add_item(conn, a, "Kinda", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, a, "Kinda important update",
+             desc="Kinda important update summary. " + "x" * 250, vec=v(1, 0, 0, 0))
     c = _cluster(conn)[0]
     # ~0.75 vs [0.75, 0.66, 0, 0] normalized
     other = [0.75, 0.6614378, 0.0, 0.0]
@@ -104,8 +108,10 @@ def test_mid_similarity_is_related_new_story(conn):
 def test_cap_defers_low_importance_writes(conn):
     a = add_source(conn, "PlayStation Blog", weight=1.5)
     b = add_source(conn, "Xbox Wire", weight=1.5)
-    add_item(conn, a, "PS thing", desc="x" * 250, vec=v(1, 0, 0, 0))
-    add_item(conn, b, "Xbox thing", desc="x" * 250, vec=v(0, 1, 0, 0))
+    add_item(conn, a, "PS5 exclusive launch",
+             desc="PS5 exclusive launch summary. " + "x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, b, "Xbox exclusive launch",
+             desc="Xbox exclusive launch summary. " + "x" * 250, vec=v(0, 1, 0, 0))
     prepared = [prepare(c, [], min_weight=1.5, min_desc=200, followup=0.80, related=0.70)
                 for c in _cluster(conn)]
     assert all(p.decision == "write" for p in prepared)
@@ -114,3 +120,34 @@ def test_cap_defers_low_importance_writes(conn):
     deferred = [p for p in capped if (p.skip_reason or "").startswith("한도")]
     assert len(writes) == 1
     assert len(deferred) == 1
+
+
+def test_pcgamer_style_bio_is_not_material(conn):
+    """PC Gamer 처럼 summary 자리에 기자 소개문이 오면 재료로 보지 않는다."""
+    pcg = add_source(conn, "PC Gamer")
+    add_item(
+        conn, pcg,
+        "I played the adventure game so scandalous that it was physically destroyed by UK customs",
+        desc="Rick has been fascinated by PC gaming since he was seven years old. "
+             "He grew up on a diet of similarly unsuitable games. " * 8,
+        vec=v(1, 0, 0, 0),
+    )
+    c = _cluster(conn)[0]
+    ok, reason = should_write(c, min_weight=1.0, min_desc=200)
+    assert not ok and reason == "재료부족"
+
+
+def test_cjk_short_summary_is_material(conn):
+    """일본어 요약은 100자 남짓이어도 재료로 본다(CJK 는 글자당 정보량이 크다)."""
+    g4 = add_source(conn, "4Gamer")
+    add_item(
+        conn, g4,
+        "ソウル・トリアージADV「UN:Me」，2027年に発売延期。主人公役は花守ゆみりさんに決定",
+        desc="集英社ゲームズは本日（2026年9月17日），ソウル・トリアージアドベンチャー「UN:Me」の"
+             "発売時期を2027年に延期すると発表した。あわせて，主人公役を花守ゆみりさんが担当する"
+             "ことを発表し，少女に宿る4つの魂のうち，魂IIと魂IVの詳細を公開した。",
+        vec=v(1, 0, 0, 0),
+    )
+    c = _cluster(conn)[0]
+    ok, reason = should_write(c, min_weight=1.0, min_desc=200)
+    assert ok and reason is None

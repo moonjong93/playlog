@@ -3,10 +3,23 @@
 from __future__ import annotations
 
 import math
+import re
 
 from .cluster import CLAIM_RETRIEVED
 from .models import Cluster, Prepared, StoryRow
 from .vec import dot
+
+_TAG = re.compile(r"<[^>]+>")
+_URL = re.compile(r"https?://\S+")
+_WORD = re.compile(r"[0-9a-z]{4,}")
+_CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7a3]")
+
+# 요약이 제목과 같은 대상을 다루는지 볼 때 무시할 흔한 단어.
+_STOPWORDS = {
+    "that", "this", "with", "have", "from", "they", "will", "been", "were", "what",
+    "when", "which", "their", "there", "about", "into", "over", "more", "than",
+    "says", "said", "news", "game", "games", "gamers", "pcgamer",
+}
 
 
 def article_source_ids(cluster: Cluster) -> set[int]:
@@ -17,17 +30,39 @@ def article_source_ids(cluster: Cluster) -> set[int]:
     return ids
 
 
+def _subject_tokens(text: str) -> set[str]:
+    body = _URL.sub(" ", _TAG.sub(" ", text or "")).lower()
+    words = {w for w in _WORD.findall(body) if w not in _STOPWORDS}
+    cjk = "".join(ch for ch in body if _CJK.match(ch))
+    grams = {cjk[i:i + 2] for i in range(len(cjk) - 1)}
+    return words | grams
+
+
+def _min_desc_len(desc: str, min_desc: int) -> int:
+    """CJK(일본어·중국어) 요약은 글자당 정보량이 커서 더 짧아도 재료로 본다."""
+    cjk = sum(1 for ch in desc if _CJK.match(ch))
+    if desc and cjk / len(desc) >= 0.3:
+        return min(min_desc, 80)
+    return min_desc
+
+
 def has_body_material(cluster: Cluster, *, min_desc: int = 200) -> bool:
     """제목 말고 쓸 재료가 하나라도 있는가.
 
-    desc 가 min_desc 이상이거나 본문(content)이 있어야 재료로 본다.
-    제목만 있거나 짧은 발췌뿐인 소스(예: PC Gamer 30자 요약)는 쓰지 않는다.
+    desc 가 충분히 길고(_min_desc_len) 그 소스의 제목과 같은 대상을 다뤄야 재료로 본다.
+    길이만 보면 PC Gamer 처럼 기자 소개문(bio)을 summary 로 주는 피드가 통과해서,
+    기사 대신 "소스팩에 본문이 없다"는 문장이 나온다.
     """
     items = list(cluster.seeds) + [h.item for h in cluster.retrieved]
-    return any(
-        len((it.description or "").strip()) >= min_desc or (it.content or "").strip()
-        for it in items
-    )
+    for it in items:
+        if (it.content or "").strip():
+            return True
+        desc = (it.description or "").strip()
+        if len(desc) < _min_desc_len(desc, min_desc):
+            continue
+        if len(_subject_tokens(it.title) & _subject_tokens(desc)) >= 2:
+            return True
+    return False
 
 
 def should_write(cluster: Cluster, *, min_weight: float, min_desc: int) -> tuple[bool, str | None]:

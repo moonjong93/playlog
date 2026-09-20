@@ -76,8 +76,10 @@ def _community_comments(payload: dict) -> list[dict]:
 def test_persist_claims_items_so_second_run_is_empty(conn, tmp_path):
     ign = add_source(conn, "IGN")
     gem = add_source(conn, "Gematsu")
-    add_item(conn, ign, "Shape of Dreams launches", desc="x" * 250, vec=v(1, 0, 0, 0))
-    add_item(conn, gem, "Shape of Dreams out now", desc="x" * 250, vec=v(0.98, 0.1, 0, 0))
+    add_item(conn, ign, "Shape of Dreams launches",
+             desc="Shape of Dreams launches today. " + "x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, gem, "Shape of Dreams out now",
+             desc="Shape of Dreams out now on PC. " + "x" * 250, vec=v(0.98, 0.1, 0, 0))
     s = make_settings(tmp_path)
     cands, prepared = build_prepared(conn, s)
     assert len(prepared) == 1
@@ -108,12 +110,14 @@ def test_thin_singleton_is_skipped_with_reason(conn, tmp_path):
 def test_merge_attaches_to_existing_story(conn, tmp_path):
     ign = add_source(conn, "IGN")
     gem = add_source(conn, "Gematsu")
-    add_item(conn, ign, "First", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, ign, "Starfield update released",
+             desc="Starfield update released today. " + "x" * 250, vec=v(1, 0, 0, 0))
     s = make_settings(tmp_path)
     run_once(conn, s, write=False)
     sid = conn.execute("SELECT id FROM stories").fetchone()["id"]
     assert conn.execute("SELECT status FROM stories").fetchone()["status"] == "clustered"
-    add_item(conn, gem, "Follow-up", desc="y" * 250, vec=v(0.99, 0.05, 0, 0))
+    add_item(conn, gem, "Starfield update released",
+             desc="Starfield update released patch notes. " + "y" * 250, vec=v(0.99, 0.05, 0, 0))
     run_once(conn, s, write=False)
     n = conn.execute("SELECT COUNT(*) c FROM stories").fetchone()["c"]
     assert n == 1
