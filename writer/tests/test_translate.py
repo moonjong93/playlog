@@ -148,3 +148,16 @@ def test_translate_empty_input_makes_no_call():
 
     assert translate_comments(_chat(handler), [], model="m") == []
     assert calls["n"] == 0
+
+
+def test_parse_array_takes_first_array_when_model_adds_commentary():
+    """실측(deepseek-v4-flash-0731): 배열 + 해설 + 배열 반복. 첫 배열만 읽는다."""
+    from writer.translate import _parse_array
+
+    text = (
+        '[{"author": "a", "text": "번역1"}, {"author": "b", "text": "번역2"}]\n\n'
+        '"번역1"은 자연스럽다. 문장 수 유지.\n'
+        '[{"author": "a", "text": "번역1"}, {"author": "b", "text": "번역2"}]'
+    )
+    rows = _parse_array(text)
+    assert [r["text"] for r in rows] == ["번역1", "번역2"]

@@ -29,6 +29,8 @@ SYSTEM = """
 
 출력은 입력과 같은 순서의 JSON 배열 하나만:
 [{"author":"...","text":"..."}]
+
+JSON 배열만 출력한다. 설명·해설·번역 이유·다시 쓴 배열을 덧붙이지 않는다.
 """.strip()
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.I | re.M)
@@ -41,22 +43,20 @@ def _is_korean_only(text: str) -> bool:
 
 
 def _parse_array(text: str) -> list:
+    """첫 번째 JSON 배열만 집는다.
+
+    모델이 배열 뒤에 해설을 붙이거나 배열을 반복해도(실측: deepseek-v4-flash-0731)
+    첫 배열만 읽으면 되므로 raw_decode 로 정확히 잘라낸다.
+    """
     raw = _FENCE.sub("", (text or "").strip()).strip()
+    start = raw.find("[")
+    if start < 0:
+        return []
     try:
-        val = json.loads(raw)
-        if isinstance(val, list):
-            return val
+        val, _end = json.JSONDecoder().raw_decode(raw[start:])
     except json.JSONDecodeError:
-        pass
-    start, end = raw.find("["), raw.rfind("]")
-    if start >= 0 and end > start:
-        try:
-            val = json.loads(raw[start : end + 1])
-        except json.JSONDecodeError:
-            return []
-        if isinstance(val, list):
-            return val
-    return []
+        return []
+    return val if isinstance(val, list) else []
 
 
 def _user_text(comments: list[dict]) -> str:

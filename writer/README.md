@@ -98,8 +98,10 @@ uv run writer bench show --run-id 6
 기본 모델은 `.env` 의 `BENCH_MODELS` (쉼표 구분):
 
 ```
-BENCH_MODELS=inclusionai/ling-3.0-flash,deepseek/deepseek-v4-flash,google/gemma-4-26b-a4b-it,google/gemma-4-31b-it,upstage/solar-pro4,google/gemini-2.5-flash-lite,openai/gpt-5.6-luna
+BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai/gpt-5.6-luna,google/gemma-4-31b-it,upstage/solar-pro4
 ```
+
+현재 기본 `WRITER_MODEL=deepseek/deepseek-v4-flash-0731` (run-34: 20케이스 $0.0027·한자누출 0·luna 대비 1/2 비용, 4배 느림). v4.1-flash 는 더 자세하지만 케이스당 3.6배 비싸고 3배 느려서 접었다. luna 는 빠르지만 "역할놀이 게임"(RPG) 같은 직역이 나온다.
 
 리포트 요약에 `한자누출`(한자·가나가 섞인 출력 건수)과 `원제누락`(로마자 원제를 안 쓴 건수)이 플래그로 붙는다. **출력은 고치지 않고 표시만** 한다. `write` 태스크는 요약(lede)도 같이 보여준다.
 
@@ -111,13 +113,18 @@ BENCH_MODELS=inclusionai/ling-3.0-flash,deepseek/deepseek-v4-flash,google/gemma-
 
 # 선별 규칙 (1차, LLM 없음)
 
-- **제목만 있는 소스**(요약·본문 없음) → `skipped` (항목은 소비해서 다음 주기에 안 나옴)
+- **쓸 재료가 없는 소스** → `skipped` (항목은 소비해서 다음 주기에 안 나옴)
+  - 요약이 충분히 길어야 하고(영어 200자 / 일본어 등 CJK 80자), 그 소스의 **제목과 같은 대상**을
+    다뤄야 한다(영단어 4자+/CJK 2-gram 겹침 2개 이상). PC Gamer 처럼 RSS summary 자리에
+    기자 소개문(bio)을 넣는 피드는 여기서 걸러지고, 레딧 글만 남은 스토리도 쓰지 않는다
 - 그 외 클러스터는 모두 쓴다. 매체 수·weight 는 importance 점수일 뿐 발매 게이트가 아니다
 - 기존 스토리 센트로이드 ≥ 0.80 → 같은 사건에 붙이고 (새 시드가 있으면) 갱신
 - 0.70~0.80 → 새 스토리 + `related`
+- 발행 전에 커뮤니티(레딧) 댓글을 한국어로 번역해 `sources[].comments` 로 보낸다
+  (댓글이 있을 때만 호출, 실패하면 원문 유지하고 발행은 계속. `llm_usage.role='translate'`)
 - `WRITER_MAX_PER_RUN` > 0 이면 한 주기 상한 (기본 0 = 무제한). 초과분은 소비하지 않고 다음 주기로 넘긴다.
 
-RAG: 시드 센트로이드로 7일 창을 전수 내적. 기사 0.65+ top-8, 커뮤니티 0.70+ top-3. 0.72 미만 retrieved 는 팩에만 넣고 소비하지 않는다.
+RAG: 시드 센트로이드로 7일 창을 전수 내적. 기사 0.65+ top-8, 커뮤니티 0.50+ top-3(반응/댓글이 있는 글 우선). 0.72 미만 retrieved 는 팩에만 넣고 소비하지 않는다.
 
 ---
 
