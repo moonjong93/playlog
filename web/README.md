@@ -62,6 +62,7 @@ curl -sS -X POST http://127.0.0.1:8787/internal/articles \
 | `SITE_URL` | | (빈값) | canonical·OG·RSS·sitemap 의 절대 URL 기준. 비우면 요청 `Host`(origin)를 쓴다 |
 | `COOKIE_SECURE` | | 0 | 1이면 쿠키 `Secure` |
 | `RATE_LIMIT_DISABLED` | | 0 | 1이면 리밋 해제(부하 테스트용) |
+| `GOOGLE_SITE_VERIFICATION`, `NAVER_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | | (빈값) | 각 서치콘솔 소유확인 값. 넣으면 head 에 해당 메타태그가 붙는다 |
 
 ## SEO · 공유 카드
 
@@ -82,6 +83,7 @@ curl -sS -X POST http://127.0.0.1:8787/internal/articles \
 - 구조화 데이터(JSON-LD): 모든 페이지에 `WebSite` + `Organization`, 기사에 `NewsArticle`(제목·요약·이미지·발행/수정 시각·태그·댓글 수), 피드에 `ItemList`. 전부 `<`를 이스케이프해 `</script>`로 끊기지 않게 한다.
 - 검색 페이지는 `noindex, follow`, 나머지는 `max-image-preview:large, max-snippet:-1`(+ canonical, og/twitter 카드, `rel=prev/next`). 기사 하단의 "관련 기사"는 같은 태그를 많이 공유하는 순으로 붙는다(내부 링크).
 - `og:image`·canonical·sitemap 은 `SITE_URL` 이 있으면 그 값, 없으면 요청의 origin 을 쓴다. 운영에서는 도메인 고정을 위해 `SITE_URL` 을 채우는 걸 권한다.
+- 검색엔진 등록 순서: 도메인 확정 → `SITE_URL` 채우기 → 서치콘솔 소유확인 값(`GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` / `BING_SITE_VERIFICATION`)을 넣고 재기동 → 각 콘솔에 `https://<도메인>/sitemap.xml`, `/sitemap-news.xml` 제출. `robots.txt` 는 크롤러가 자동으로 읽는다.
 
 ## 배포 (개인 서버 + Cloudflare Tunnel)
 

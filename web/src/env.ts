@@ -41,6 +41,10 @@ export const env = {
   /** OG/RSS/sitemap 절대 URL. 빈 값이면 상대경로를 쓴다. */
   siteUrl: (process.env.SITE_URL?.trim() || "").replace(/\/+$/, ""),
   cookieSecure: bool("COOKIE_SECURE"),
+  /** 검색엔진 소유확인 메타태그 값(선택). 서치콘솔 등록에 쓴다. */
+  googleSiteVerification: process.env.GOOGLE_SITE_VERIFICATION?.trim() || "",
+  naverSiteVerification: process.env.NAVER_SITE_VERIFICATION?.trim() || "",
+  bingSiteVerification: process.env.BING_SITE_VERIFICATION?.trim() || "",
 };
 
 /** 부하 테스트용 스위치. 테스트에서 런타임에 토글할 수 있게 매번 읽는다. */

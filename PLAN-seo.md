@@ -44,6 +44,7 @@ web/
 - canonical(자기 참조, 절대 URL), `rel=prev/next`(페이지네이션), `theme-color`, favicon 3종 + 매니페스트
 - OG: `og:image`(1200×630, type·width·height·alt), `og:locale`, 기사면 `article:published_time/modified_time/tag`
 - Twitter: `summary_large_image` + `twitter:image(:alt)`
+- 소유확인: `GOOGLE_SITE_VERIFICATION`/`NAVER_SITE_VERIFICATION`/`BING_SITE_VERIFICATION` 를 채우면 각 콘솔 메타태그가 붙는다(서치콘솔 등록용)
 
 ## 5. 구조화 데이터
 

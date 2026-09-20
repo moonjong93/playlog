@@ -383,6 +383,15 @@ export function layout(options: {
         ${description ? html`<meta name="description" content="${description}" />` : ""}
         <meta name="robots" content="${options.robots ?? ROBOTS_DEFAULT}" />
         <meta name="theme-color" content="#0f131d" />
+        ${env.googleSiteVerification
+      ? html`<meta name="google-site-verification" content="${env.googleSiteVerification}" />`
+      : ""}
+        ${env.naverSiteVerification
+      ? html`<meta name="naver-site-verification" content="${env.naverSiteVerification}" />`
+      : ""}
+        ${env.bingSiteVerification
+      ? html`<meta name="msvalidate.01" content="${env.bingSiteVerification}" />`
+      : ""}
         ${canonical
       ? html`<link rel="canonical" href="${absoluteUrl(canonical, options.origin)}" />`
       : ""}
