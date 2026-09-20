@@ -139,6 +139,13 @@
   border-radius: 2px;
 }
 
+mark {
+  background: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  color: var(--color-on-surface);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .article-body {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;

@@ -7,3 +7,5 @@
 2026-09-20 18:38:01 | ISSUE=collector | 4Gamer 피드가 일부 항목 description을 빈 채로 발행(소스측, 100개 중 1~12%). 콜렉터 파싱은 정상 — writer의 제목만 skip으로 처리. 고칠 것 없음
 2026-09-20 18:38:01 | ISSUE=writer | 위키 ja→ko 로컬 덤프(page+langlinks 366MB) 보류: luna가 새는 건 한국어 위키 문서가 없는 희귀 고유명사(ファレイドリア 등)라 ROI 낮음. 한자누출 플래그로 감시하다 필요 시 소사전
 2026-09-20 18:38:01 | ISSUE=writer | 남은 것: section enum 조정(사용자 예정), luna 실제 발행 1편 미확인. 이 디렉터리는 git 아님 → 백업이 유일 안전망
+2026-09-20 19:12:44 | ISSUE=web | 웹 전체 공개 대비 개편: ?key 인증 제거(읽기 공개, /internal만 Bearer), 익명 세션+IP 레이트리밋(전역300/분·검색60/분·댓글30초/IP 10시간), htmx4 도입(라이브 검색·댓글·삭제), sanitize-html 본문 정화, 섹션 enum 정리(테크→''), 페이지네이션·섹션탭·RSS·sitemap·robots·OG, 죽은 UI 제거, vitest 55케이스, Dockerfile+compose(127.0.0.1 바인딩·TRUST_PROXY=cloudflare)
+2026-09-20 19:12:44 | ISSUE=web | 검증: tsc/55테스트 통과, ego-browser로 라이브검색(한글 3건·mark)·댓글 201/삭제·429 입력보존·빈결과 확인. 폼 리셋을 after:request→HX-Trigger(commentPosted)로 바꿔 실패 시 입력 보존. ingest XSS 스모크: script/onclick/javascript: 제거, 외부링크 noopener+target, 401 확인 후 스모크 행 정리(articles 46/comments 0)

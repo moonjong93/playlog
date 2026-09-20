@@ -8,23 +8,29 @@
   },
   "scripts": {
     "css": "tailwindcss -i ./src/styles.css -o ./dist/app.css",
-    "predev": "npm run css",
+    "assets": "mkdir -p dist && cp node_modules/htmx.org/dist/htmx.min.js dist/htmx.min.js",
+    "predev": "npm run css && npm run assets",
     "dev": "tsx watch src/index.ts",
-    "prestart": "npm run css",
-    "start": "tsx src/index.ts"
+    "prestart": "npm run css && npm run assets",
+    "start": "tsx src/index.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^17.2.3",
-    "hono": "^4.9.9"
+    "hono": "^4.9.9",
+    "htmx.org": "4.0.0",
+    "sanitize-html": "^2.17.7"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.13",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.5.2",
+    "@types/sanitize-html": "^2.16.1",
     "tailwindcss": "^4.1.13",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.1"
   }
 }
