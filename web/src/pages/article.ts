@@ -6,7 +6,6 @@ import {
   formatTime,
   groupSources,
   layout,
-  sourceBadges,
   summaryBox,
   tagChips,
   type ArticleRow,
@@ -180,20 +179,19 @@ export function articlePage(options: {
     ],
     current: "article",
     body: html`<article>
-      <div class="flex flex-wrap items-center gap-2 mb-3">
-        ${sourceBadges(article.sources_json)}
+      <div class="flex items-start justify-between gap-x-4">
+        <h1
+          class="min-w-0 text-headline-xl max-md:text-headline-xl-mobile font-headline-xl font-bold text-on-surface tracking-tight leading-tight"
+        >
+          ${article.title_ko}
+        </h1>
         <time
-          class="text-label-mono-sm font-label-mono-sm text-outline"
+          class="shrink-0 pt-1 text-label-mono-sm font-label-mono-sm text-outline"
           datetime="${article.published_at}"
           title="${formatTime(article.published_at)}"
           >${formatRelativeTime(article.published_at)}</time
         >
       </div>
-      <h1
-        class="text-headline-xl max-md:text-headline-xl-mobile font-headline-xl font-bold text-on-surface tracking-tight leading-tight"
-      >
-        ${article.title_ko}
-      </h1>
       ${tagChips(article.tags ?? [])} ${summaryBox(article.lede_ko)}
       <div class="article-body mt-8">
         ${raw(article.body_html)}
