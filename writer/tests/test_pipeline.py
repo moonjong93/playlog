@@ -41,27 +41,27 @@ def test_persist_claims_items_so_second_run_is_empty(conn, tmp_path):
     assert prepared2 == []
 
 
-def test_short_singleton_is_written_not_skipped(conn, tmp_path):
+def test_thin_singleton_is_skipped_with_reason(conn, tmp_path):
+    """발췌가 짧은 소스는 재료로 보지 않는다(새 기준)."""
     a = add_source(conn, "PC Gamer")
     add_item(conn, a, "Tiny blurb", desc="60 chars", vec=v(1, 0, 0, 0))
     s = make_settings(tmp_path)
     stats = run_once(conn, s, write=False)
     row = conn.execute("SELECT status, skip_reason FROM stories").fetchone()
-    assert row["status"] == "clustered"
-    assert not row["skip_reason"]
-    assert conn.execute("SELECT COUNT(*) c FROM writing_items").fetchone()["c"] == 1
+    assert row["status"] == "skipped"
+    assert row["skip_reason"] == "재료부족"
     assert stats["stories_new"] == 1
 
 
 def test_merge_attaches_to_existing_story(conn, tmp_path):
     ign = add_source(conn, "IGN")
     gem = add_source(conn, "Gematsu")
-    add_item(conn, ign, "First", desc="short", vec=v(1, 0, 0, 0))
+    add_item(conn, ign, "First", desc="x" * 250, vec=v(1, 0, 0, 0))
     s = make_settings(tmp_path)
     run_once(conn, s, write=False)
     sid = conn.execute("SELECT id FROM stories").fetchone()["id"]
     assert conn.execute("SELECT status FROM stories").fetchone()["status"] == "clustered"
-    add_item(conn, gem, "Follow-up", desc="short", vec=v(0.99, 0.05, 0, 0))
+    add_item(conn, gem, "Follow-up", desc="y" * 250, vec=v(0.99, 0.05, 0, 0))
     run_once(conn, s, write=False)
     n = conn.execute("SELECT COUNT(*) c FROM stories").fetchone()["c"]
     assert n == 1
@@ -140,3 +140,35 @@ def test_write_story_sends_tags_and_republish_omits_them(conn, tmp_path, monkeyp
     write_story(conn, s, chat, story_id=sid, run_id=None, prompts=prompts, pver=pver)
     assert len(sent) == 2
     assert "tags" not in sent[1]  # 재발행: 웹이 기존 태그를 유지한다
+
+
+def test_community_only_story_is_skipped(conn, tmp_path):
+    """시드를 잃고 레딧 글만 남은 스토리는 기사로 쓰지 않는다(LLM 호출도 하지 않는다)."""
+    ign = add_source(conn, "IGN", weight=1.5)
+    reddit = add_source(conn, "Reddit", kind="community", weight=0.8)
+    add_item(conn, ign, "Seed article", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(
+        conn, reddit, "Reddit thread",
+        desc="레딧 글",
+        vec=v(0.99, 0.1, 0, 0),
+        content='{"post_title": "t", "comments": [{"author": "a", "text": "재밌다"}]}',
+    )
+    s = make_settings(tmp_path)
+    run_once(conn, s, write=False)
+    sid = conn.execute("SELECT id FROM stories").fetchone()["id"]
+    # 다른 스토리가 시드를 가져간 상태를 재현한다.
+    conn.execute(
+        "UPDATE story_sources SET role='community' WHERE story_id=? AND role='seed'", (sid,)
+    )
+
+    called = {"n": 0}
+
+    def handler(request):
+        called["n"] += 1
+        return httpx.Response(500, json={})
+
+    run_once(conn, s, chat=_chat(handler))
+    row = conn.execute("SELECT status, skip_reason FROM stories WHERE id=?", (sid,)).fetchone()
+    assert row["status"] == "skipped"
+    assert row["skip_reason"] == "재료부족"
+    assert called["n"] == 0

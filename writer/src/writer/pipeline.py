@@ -74,6 +74,8 @@ def persist_prepared(conn: Conn, settings: Settings, prepared: list[Prepared],
     """
     existing = load_recent_stories(conn, iso_days_ago(settings.merge_days))
     consumed = consumed_ids(conn)
+    # 이번 배치의 시드는 남의 retrieved/community 가 가져가지 못하게 미리 잡아둔다.
+    reserved = {s.id for p in prepared for s in p.cluster.seeds}
     stats = {"stories_new": 0, "stories_updated": 0, "claimed": 0}
 
     for p in prepared:
@@ -81,7 +83,10 @@ def persist_prepared(conn: Conn, settings: Settings, prepared: list[Prepared],
             continue
         if p.decision == "merge" and p.existing is not None:
             story_id = p.existing.id
-            hits = claimed_hits(p.cluster, consumed=consumed)
+            hits = claimed_hits(
+                p.cluster, consumed=consumed, community_min=settings.rag_community_min,
+                reserved=reserved,
+            )
             added = store.attach_hits(conn, story_id, hits, run_id, consumed)
             stats["claimed"] += len(added)
             cvec = store.refresh_story_centroid(conn, story_id, settings.embed_model)
@@ -100,12 +105,17 @@ def persist_prepared(conn: Conn, settings: Settings, prepared: list[Prepared],
             continue
 
         slug_base = ascii_slug(p.cluster.seeds[0].title if p.cluster.seeds else "story")
-        story_id = store.insert_story(conn, p)
+        story_id = store.insert_story(
+            conn, p, community_min=settings.rag_community_min, reserved=reserved
+        )
         store.update_story_status(
             conn, story_id, "skipped" if p.decision == "skip" else "clustered",
             slug=f"{slug_base}-{story_id}",
         )
-        hits = claimed_hits(p.cluster, consumed=consumed)
+        hits = claimed_hits(
+            p.cluster, consumed=consumed, community_min=settings.rag_community_min,
+            reserved=reserved,
+        )
         added = store.attach_hits(conn, story_id, hits, run_id, consumed)
         stats["claimed"] += len(added)
         if p.relation == "related" and p.existing is not None:
@@ -134,6 +144,14 @@ def _hits_to_cluster(hits: list[Hit]) -> Cluster:
     cl.retrieved = [h for h in hits if h.role == "retrieved"]
     cl.community = [h for h in hits if h.role == "community"]
     return cl
+
+
+def _has_article_source(hits: list[Hit]) -> bool:
+    """기사 출처(시드/retrieved)가 하나라도 있는가.
+
+    커뮤니티 글만 있는 스토리는 기사로 쓸 수 없다(레딧 스레드만으로 기사를 쓰게 된다).
+    """
+    return any(h.role != "community" for h in hits)
 
 
 def write_story(conn: Conn, settings: Settings, chat: OpenRouterChat, *,
@@ -242,9 +260,11 @@ def run_once(conn: Conn, settings: Settings, *, lookback: int | None = None,
                     break
                 log.info("쓰기 %d/%d story=%s", i, len(pending), sid)
                 hits = store.load_story_hits(conn, sid, settings.embed_model)
-                if not has_body_material(_hits_to_cluster(hits)):
-                    store.update_story_status(conn, sid, "skipped", skip_reason="제목만")
-                    log.info("건너뜀(제목만): story=%s", sid)
+                if not _has_article_source(hits) or not has_body_material(
+                    _hits_to_cluster(hits), min_desc=settings.min_singleton_desc
+                ):
+                    store.update_story_status(conn, sid, "skipped", skip_reason="재료부족")
+                    log.info("건너뜀(재료부족): story=%s", sid)
                     continue
                 try:
                     write_story(conn, settings, chat, story_id=sid, run_id=run_id,

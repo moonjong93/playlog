@@ -17,17 +17,24 @@ def article_source_ids(cluster: Cluster) -> set[int]:
     return ids
 
 
-def has_body_material(cluster: Cluster) -> bool:
-    """제목 말고 쓸 재료(요약·본문)가 하나라도 있는가. 제목만 있는 소스는 쓰지 않는다."""
+def has_body_material(cluster: Cluster, *, min_desc: int = 200) -> bool:
+    """제목 말고 쓸 재료가 하나라도 있는가.
+
+    desc 가 min_desc 이상이거나 본문(content)이 있어야 재료로 본다.
+    제목만 있거나 짧은 발췌뿐인 소스(예: PC Gamer 30자 요약)는 쓰지 않는다.
+    """
     items = list(cluster.seeds) + [h.item for h in cluster.retrieved]
-    return any((it.description or "").strip() or (it.content or "").strip() for it in items)
+    return any(
+        len((it.description or "").strip()) >= min_desc or (it.content or "").strip()
+        for it in items
+    )
 
 
 def should_write(cluster: Cluster, *, min_weight: float, min_desc: int) -> tuple[bool, str | None]:
-    """발매 게이트가 아니다. 다만 제목만 있는 소스는 쓰지 않는다. 매체 수·weight는 importance 점수다."""
-    _ = (min_weight, min_desc)
-    if not has_body_material(cluster):
-        return False, "제목만"
+    """발매 게이트가 아니다. 다만 쓸 재료가 없는 소스는 쓰지 않는다. 매체 수·weight는 importance 점수다."""
+    _ = min_weight
+    if not has_body_material(cluster, min_desc=min_desc):
+        return False, "재료부족"
     return True, None
 
 

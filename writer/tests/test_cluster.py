@@ -70,6 +70,69 @@ def test_expand_attaches_retrieved_and_community(conn):
     assert any(h.item.title == "Thread2" for h in hits)
 
 
+def test_claim_threshold_follows_setting(conn):
+    ign = add_source(conn, "IGN")
+    reddit = add_source(conn, "Reddit", kind="community", weight=0.8)
+    add_item(conn, ign, "Seed3", vec=v(1, 0, 0, 0))
+    add_item(conn, reddit, "Thread3", vec=v(0.52, 0.854, 0, 0))  # ~0.52
+    cands = load_candidates(conn, MODEL, iso_hours_ago(36))
+    window = load_window(conn, MODEL, iso_hours_ago(168))
+    seed = next(c for c in cluster_articles(cands, 0.72) if c.seeds[0].title == "Seed3")
+    expand(seed, window, article_min=0.65, article_k=8, community_min=0.50, community_k=3)
+    assert any(h.item.title == "Thread3" for h in seed.community)
+    # 기본 상수(0.58)로는 claim 되지 않는다.
+    assert all(h.item.title != "Thread3" for h in claimed_hits(seed))
+    # 설정값을 넘기면 claim 된다.
+    assert any(
+        h.item.title == "Thread3"
+        for h in claimed_hits(seed, community_min=0.50)
+    )
+
+
+def test_expand_prefers_community_with_comments(conn):
+    ign = add_source(conn, "IGN")
+    reddit = add_source(conn, "Reddit", kind="community", weight=0.8)
+    add_item(conn, ign, "Seed4", vec=v(1, 0, 0, 0))
+    add_item(conn, reddit, "NoComments", vec=v(0.99, 0.14, 0, 0))
+    add_item(
+        conn, reddit, "WithComments",
+        desc="레딧 글",
+        vec=v(0.95, 0.31, 0, 0),
+        content='{"post_title": "t", "comments": [{"author": "a", "text": "재밌다"}]}',
+    )
+    cands = load_candidates(conn, MODEL, iso_hours_ago(36))
+    window = load_window(conn, MODEL, iso_hours_ago(168))
+    seed = next(c for c in cluster_articles(cands, 0.72) if c.seeds[0].title == "Seed4")
+    expand(seed, window, article_min=0.65, article_k=8, community_min=0.50, community_k=1)
+    # 유사도는 NoComments 가 높지만, 반응(댓글)이 있는 쪽을 쓴다.
+    assert [h.item.title for h in seed.community] == ["WithComments"]
+
+
+def test_seed_is_not_stolen_by_other_cluster_retrieved(conn):
+    """같은 매체 기사는 클러스터가 갈리지만 retrieved 로는 붙는다. 그때 남의 시드를 훔치면 안 된다."""
+    pcg = add_source(conn, "PC Gamer")
+    add_item(conn, pcg, "Cluster A seed", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, pcg, "CD Projekt article", desc="y" * 250, vec=v(0.99, 0.1, 0, 0))
+    cands = load_candidates(conn, MODEL, iso_hours_ago(36))
+    window = load_window(conn, MODEL, iso_hours_ago(168))
+    # 같은 매체라 임계값과 무관하게 두 클러스터로 갈린다.
+    clusters = cluster_articles(cands, 0.72)
+    assert len(clusters) == 2
+    other = next(c for c in clusters if c.seeds[0].title == "Cluster A seed")
+    cd = next(c for c in clusters if c.seeds[0].title == "CD Projekt article")
+    expand(other, window, article_min=0.65, article_k=8, community_min=0.50, community_k=3)
+    assert any(h.item.title == "CD Projekt article" for h in other.retrieved)
+    reserved = {s.id for c in clusters for s in c.seeds}
+
+    # 예약이 없으면 retrieved 가 남의 시드를 가져간다(예전 버그).
+    stolen = claimed_hits(other, reserved=set())
+    assert any(h.item.title == "CD Projekt article" for h in stolen)
+    # 예약이 있으면 시드는 자기 스토리에 남는다.
+    kept = claimed_hits(other, reserved=reserved)
+    assert all(h.item.title != "CD Projekt article" for h in kept)
+    assert any(h.item.title == "CD Projekt article" for h in claimed_hits(cd))
+
+
 def test_centroid_is_normalized():
     a = Item(1, 1, "A", "article", 1.0, "u", "t", "d", "", None, "now", normalize([1.0, 0, 0, 0]))
     b = Item(2, 2, "B", "article", 1.0, "u", "t", "d", "", None, "now", normalize([0.8, 0.6, 0, 0]))

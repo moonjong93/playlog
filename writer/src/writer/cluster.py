@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from .models import Cluster, Hit, Item
+from .pack import parse_comments
 from .vec import centroid, dot
 
 # 클러스터에 넣은 뒤 소비(claim)할 하한. RAG 팩에는 더 낮은 것도 넣는다.
 CLAIM_RETRIEVED = 0.72
 CLAIM_COMMUNITY = 0.58
+
+
+def has_comments(item: Item) -> bool:
+    """레딧 글의 댓글처럼, 반응으로 쓸 수 있는 재료가 있는지."""
+    return bool(parse_comments(item.content or ""))
 
 
 def cluster_articles(items: list[Item], threshold: float) -> list[Cluster]:
@@ -62,31 +68,40 @@ def expand(cluster: Cluster, pool: list[Item], *,
 
     retrieved: list[Hit] = []
     community: list[Hit] = []
+    # scored 는 이미 전체 풀을 돈 결과라, 여기서는 임계값만 보고 담는다.
     for sim, it in scored:
         if it.source_kind == "community":
-            if sim >= community_min and len(community) < community_k:
+            if sim >= community_min:
                 community.append(Hit(it, sim, "community"))
-        else:
-            if sim >= article_min and len(retrieved) < article_k:
-                retrieved.append(Hit(it, sim, "retrieved"))
-        if len(retrieved) >= article_k and len(community) >= community_k:
-            break
+        elif sim >= article_min and len(retrieved) < article_k:
+            retrieved.append(Hit(it, sim, "retrieved"))
+    # 반응(댓글)이 있는 레딧 글을 먼저 쓰고, 모자라면 나머지로 채운다.
+    community.sort(key=lambda h: (not has_comments(h.item), -h.similarity))
     cluster.retrieved = retrieved
-    cluster.community = community
+    cluster.community = community[:community_k]
     return cluster
 
 
-def claimed_hits(cluster: Cluster, *, consumed: set[int] | None = None) -> list[Hit]:
-    """스토리에 귀속시킬 항목. 이미 소비된 것은 빼서 다른 스토리를 훔치지 않는다."""
+def claimed_hits(cluster: Cluster, *, consumed: set[int] | None = None,
+                 community_min: float = CLAIM_COMMUNITY,
+                 reserved: set[int] | None = None) -> list[Hit]:
+    """스토리에 귀속시킬 항목. 이미 소비된 것은 빼서 다른 스토리를 훔치지 않는다.
+
+    reserved 는 이번 배치에서 다른 스토리의 '시드'인 항목이다. retrieved/community 가
+    남의 시드를 가져가면 그 스토리는 시드 없이 남는다(레딧 글만 있는 기사가 된다).
+    """
     skip = consumed or set()
+    reserved_ids = reserved or set()
     out: list[Hit] = []
     for s in cluster.seeds:
         if s.id not in skip:
             out.append(Hit(s, 1.0, "seed"))
     for h in cluster.retrieved:
-        if h.similarity >= CLAIM_RETRIEVED and h.item.id not in skip:
+        if (h.similarity >= CLAIM_RETRIEVED and h.item.id not in skip
+                and h.item.id not in reserved_ids):
             out.append(h)
     for h in cluster.community:
-        if h.similarity >= CLAIM_COMMUNITY and h.item.id not in skip:
+        if (h.similarity >= community_min and h.item.id not in skip
+                and h.item.id not in reserved_ids):
             out.append(h)
     return out

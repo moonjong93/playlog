@@ -17,11 +17,11 @@ def _cluster(conn, threshold=0.72):
     return clusters
 
 
-def test_two_sources_always_write(conn):
+def test_two_sources_with_material_write(conn):
     a = add_source(conn, "IGN", weight=1.0)
     b = add_source(conn, "Gematsu", weight=1.0)
-    add_item(conn, a, "A", desc="short", vec=v(1, 0, 0, 0))
-    add_item(conn, b, "B", desc="short", vec=v(0.98, 0.1, 0, 0))
+    add_item(conn, a, "A", desc="x" * 250, vec=v(1, 0, 0, 0))
+    add_item(conn, b, "B", desc="y" * 250, vec=v(0.98, 0.1, 0, 0))
     c = _cluster(conn)[0]
     ok, reason = should_write(c, min_weight=1.0, min_desc=200)
     assert ok and reason is None
@@ -32,17 +32,20 @@ def test_title_only_singleton_is_skipped(conn):
     add_item(conn, a, "Title only", desc="", vec=v(1, 0, 0, 0))
     c = _cluster(conn)[0]
     ok, reason = should_write(c, min_weight=1.0, min_desc=200)
-    assert not ok and reason == "제목만"
+    assert not ok and reason == "재료부족"
     p = prepare(c, [], min_weight=1.0, min_desc=200, followup=0.80, related=0.70)
     assert p.decision == "skip"
 
 
-def test_short_singleton_still_writes(conn):
+def test_short_singleton_is_skipped(conn):
+    """PC Gamer 처럼 30자 발췌만 주는 소스는 재료로 보지 않는다."""
     a = add_source(conn, "PC Gamer", weight=1.0)
     add_item(conn, a, "Thin", desc="short", vec=v(1, 0, 0, 0))
     c = _cluster(conn)[0]
+    ok, reason = should_write(c, min_weight=1.0, min_desc=200)
+    assert not ok and reason == "재료부족"
     p = prepare(c, [], min_weight=1.0, min_desc=200, followup=0.80, related=0.70)
-    assert p.decision == "write"
+    assert p.decision == "skip"
 
 
 def test_long_official_singleton_writes(conn):

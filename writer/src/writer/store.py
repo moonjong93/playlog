@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .cluster import claimed_hits
+from .cluster import CLAIM_COMMUNITY, claimed_hits
 from .db import Conn, utcnow
 from .models import Cluster, Hit, Prepared, StoryRow
 from .vec import centroid, pack, unpack
@@ -78,10 +78,12 @@ def _source_counts(hits: list[Hit]) -> tuple[int, int]:
     return len(article_src), comm
 
 
-def insert_story(conn: Conn, prepared: Prepared) -> int:
+def insert_story(conn: Conn, prepared: Prepared, *,
+                 community_min: float = CLAIM_COMMUNITY,
+                 reserved: set[int] | None = None) -> int:
     now = utcnow()
     ws, we = _window(prepared.cluster)
-    hits = claimed_hits(prepared.cluster)
+    hits = claimed_hits(prepared.cluster, community_min=community_min, reserved=reserved)
     nsrc, ncomm = _source_counts(hits)
     status = "skipped" if prepared.decision == "skip" else "clustered"
     cur = conn.execute(

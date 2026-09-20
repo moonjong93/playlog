@@ -164,7 +164,7 @@ CLI로 `embed` 를 반복 호출하면 매번 모델을 다시 로드한다(8초
 | `NEWS_USER_AGENT` | 브라우저 UA | 기본 UA (Reddit 은 피드별 UA 사용) |
 | `REDDIT_SLEEP` | `8` | Reddit 요청 사이 최소 간격(초). 인증 RSS 기준. 없으면 60초로 올린다 |
 | `REDDIT_MIN_INTERVAL` | `3600` | Reddit 피드 재수집 최소 간격(초) |
-| `REDDIT_COMMENT_POSTS` | `2` | 새 글 중 댓글을 받을 개수(소스당). 10 으로 올리면 한 사이클이 댓글에 묶인다 |
+| `REDDIT_COMMENT_POSTS` | `8` | 새 글 + 내용 없는 기존 글 중 댓글을 받을 개수(소스당). 10 으로 올리면 한 사이클이 댓글에 묶인다 |
 | `REDDIT_USER` / `REDDIT_FEED` | (비움) | `prefs/feeds` 의 `user=` / `feed=` . **모든 공개 .rss 에 붙는 인증 토큰**. upvoted 피드 자체를 소스로 쓰지 않는다 |
 | `EMBED_PROVIDER` | `local` | `local`(내장) \| `openrouter` |
 | `EMBED_LOCAL_MODEL` | `LiquidAI/LFM2.5-Embedding-350M` | HF repo id |
