@@ -1,4 +1,5 @@
 import { html, raw } from "hono/html";
+import { newsArticleJsonLd } from "../seo.ts";
 import {
   articleSources,
   formatRelativeTime,
@@ -109,21 +110,74 @@ function ledeFirstLine(lede: string): string {
   return (lede || "").split("\n")[0]?.trim() ?? "";
 }
 
+export type RelatedRow = { slug: string; title_ko: string; published_at: string };
+
+/** 같은 태그를 많이 공유하는 기사부터. 모자라면 최신 기사로 채운다. */
+function relatedBlock(rows: RelatedRow[]) {
+  if (rows.length === 0) return "";
+  return html`<aside class="mt-12 border-t border-outline-variant pt-6">
+    <h2
+      class="mb-3 text-label-ui font-label-ui font-semibold tracking-wider text-primary"
+    >
+      관련 기사
+    </h2>
+    <ul class="space-y-2 text-body-sm font-body-sm">
+      ${rows.map(
+    (row) => html`<li class="flex items-baseline justify-between gap-3">
+          <a
+            class="text-on-surface hover:text-primary underline-offset-4 hover:underline"
+            href="/s/${encodeURIComponent(row.slug)}"
+            >${row.title_ko}</a
+          >
+          <time
+            class="shrink-0 text-label-mono-sm font-label-mono-sm text-outline"
+            datetime="${row.published_at}"
+            >${formatRelativeTime(row.published_at)}</time
+          >
+        </li>`,
+  )}
+    </ul>
+  </aside>`;
+}
+
 export function articlePage(options: {
   article: ArticleRow;
   comments: CommentRow[];
   commentCount: number;
   sessionId: string;
+  origin?: string;
+  related?: RelatedRow[];
   notice?: string;
 }) {
   const article = options.article;
   const path = `/s/${encodeURIComponent(article.slug)}`;
+  const tags = article.tags ?? [];
+  const description = ledeFirstLine(article.lede_ko) || article.title_ko;
+  const ogImage = `/og/s/${encodeURIComponent(article.slug)}.png`;
   return layout({
     title: `${article.title_ko} · Ludus Digest`,
-    description: ledeFirstLine(article.lede_ko) || article.title_ko,
+    description,
     canonical: path,
+    origin: options.origin,
     ogType: "article",
+    ogImage,
+    ogImageAlt: article.title_ko,
     publishedTime: article.published_at,
+    modifiedTime: article.updated_at,
+    keywords: tags,
+    jsonLd: [
+      newsArticleJsonLd({
+        origin: options.origin ?? "",
+        slug: article.slug,
+        title: article.title_ko,
+        description,
+        image: ogImage,
+        publishedAt: article.published_at,
+        updatedAt: article.updated_at,
+        tags,
+        commentCount: options.commentCount,
+      }),
+    ],
     current: "article",
     body: html`<article>
       <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -145,6 +199,7 @@ export function articlePage(options: {
         ${raw(article.body_html)}
       </div>
       ${communityBox(article.sources_json)} ${sourceBlock(article.sources_json)}
+      ${relatedBlock(options.related ?? [])}
       ${commentSection({
       slug: article.slug,
       comments: options.comments,

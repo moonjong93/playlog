@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { html, raw } from "hono/html";
 import { env, rootDir } from "../env.ts";
 import { recentTags } from "../tagStore.ts";
+import { organizationJsonLd, websiteJsonLd } from "../seo.ts";
+import { DEFAULT_OG_PATH, ROBOTS_DEFAULT, SITE_NAME, absoluteUrl, jsonLd } from "../site.ts";
+
+export { DEFAULT_OG_PATH, SITE_NAME, absoluteUrl };
 
 const FALLBACK_CSS = `body{background:#0f131d;color:#dfe2f1;font-family:Inter,sans-serif;margin:0}`;
 
@@ -45,10 +49,6 @@ export function parseSources(json: string): Source[] {
   } catch {
     return [];
   }
-}
-
-export function absoluteUrl(path: string): string {
-  return env.siteUrl ? `${env.siteUrl}${path}` : path;
 }
 
 export function formatTime(iso: string): string {
@@ -339,9 +339,25 @@ export function layout(options: {
   activeTag?: string;
   q?: string;
   description?: string;
+  /** 자기 참조 경로(보통 요청 경로). canonical과 og:url에 쓴다. */
   canonical?: string;
+  /** 절대 URL 기준(SITE_URL 우선, 없으면 요청 origin). */
+  origin?: string;
   ogType?: string;
+  /** OG 이미지 경로. 기본은 사이트 기본 카드. */
+  ogImage?: string;
+  ogImageAlt?: string;
   publishedTime?: string;
+  modifiedTime?: string;
+  /** article:tag 로 나가는 키워드. */
+  keywords?: string[];
+  /** robots meta 값. 기본값과 다를 때만 준다. */
+  robots?: string;
+  /** 구조화 데이터(JSON-LD). 배열이면 각각 script로 나간다. */
+  jsonLd?: unknown[];
+  /** 페이지네이션 rel=prev/next 경로. */
+  prevPath?: string;
+  nextPath?: string;
 }) {
   const current = options.current ?? "none";
   const activeTag = options.activeTag ?? "";
@@ -349,6 +365,14 @@ export function layout(options: {
   const description = options.description?.trim() ?? "";
   const ogType = options.ogType ?? "website";
   const canonical = options.canonical ?? "";
+  const ogImage = absoluteUrl(options.ogImage ?? DEFAULT_OG_PATH, options.origin);
+  const ogImageAlt = options.ogImageAlt?.trim() || options.title;
+  const keywords = (options.keywords ?? []).map((tag) => tag.trim()).filter(Boolean);
+  const scripts = [
+    websiteJsonLd(options.origin ?? ""),
+    organizationJsonLd(options.origin ?? ""),
+    ...(options.jsonLd ?? []),
+  ];
 
   return html`<!DOCTYPE html>
     <html class="dark" lang="ko">
@@ -357,20 +381,47 @@ export function layout(options: {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${options.title}</title>
         ${description ? html`<meta name="description" content="${description}" />` : ""}
-        ${canonical ? html`<link rel="canonical" href="${absoluteUrl(canonical)}" />` : ""}
-        <meta property="og:site_name" content="Ludus Digest" />
+        <meta name="robots" content="${options.robots ?? ROBOTS_DEFAULT}" />
+        <meta name="theme-color" content="#0f131d" />
+        ${canonical
+      ? html`<link rel="canonical" href="${absoluteUrl(canonical, options.origin)}" />`
+      : ""}
+        ${options.prevPath
+      ? html`<link rel="prev" href="${absoluteUrl(options.prevPath, options.origin)}" />`
+      : ""}
+        ${options.nextPath
+      ? html`<link rel="next" href="${absoluteUrl(options.nextPath, options.origin)}" />`
+      : ""}
+        <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <meta property="og:site_name" content="${SITE_NAME}" />
         <meta property="og:title" content="${options.title}" />
         ${description ? html`<meta property="og:description" content="${description}" />` : ""}
         <meta property="og:type" content="${ogType}" />
-        ${canonical ? html`<meta property="og:url" content="${absoluteUrl(canonical)}" />` : ""}
+        ${canonical
+      ? html`<meta property="og:url" content="${absoluteUrl(canonical, options.origin)}" />`
+      : ""}
         <meta property="og:locale" content="ko_KR" />
-        <meta name="twitter:card" content="summary" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="${ogImageAlt}" />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="${options.title}" />
         ${description
       ? html`<meta name="twitter:description" content="${description}" />`
       : ""}
+        <meta name="twitter:image" content="${ogImage}" />
+        <meta name="twitter:image:alt" content="${ogImageAlt}" />
+        ${keywords.map((tag) => html`<meta property="article:tag" content="${tag}" />`)}
         ${options.publishedTime
       ? html`<meta property="article:published_time" content="${options.publishedTime}" />`
+      : ""}
+        ${options.modifiedTime
+      ? html`<meta property="article:modified_time" content="${options.modifiedTime}" />`
       : ""}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
@@ -385,7 +436,12 @@ export function layout(options: {
         <style>
           ${raw(appCss)}
         </style>
-        <link rel="alternate" type="application/rss+xml" title="Ludus Digest" href="/rss.xml" />
+        <link rel="alternate" type="application/rss+xml" title="${SITE_NAME}" href="/rss.xml" />
+        ${scripts.map(
+        (value) => html`<script type="application/ld+json">
+${raw(jsonLd(value))}</script
+        >`,
+      )}
         <script src="/assets/htmx.min.js" defer></script>
       </head>
       <body

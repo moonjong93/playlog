@@ -14,6 +14,7 @@ export function tagsPage(options: {
   page: number;
   total: number;
   activeTag: string;
+  origin?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(options.total / TAGS_PAGE_SIZE));
   const rowCls =
@@ -53,9 +54,13 @@ export function tagsPage(options: {
 
   return layout({
     title: "태그 · Ludus Digest",
+    description: `Ludus Digest에 쌓인 태그 ${options.total}개. 태그를 고르면 해당 주제의 게임 업계 뉴스만 모아 봅니다.`,
     current: "tags",
     activeTag: options.activeTag,
     canonical: tagsHref(options.page),
+    origin: options.origin,
+    prevPath: options.page > 1 ? tagsHref(options.page - 1) : undefined,
+    nextPath: options.page < totalPages ? tagsHref(options.page + 1) : undefined,
     body: html`<div class="flex flex-col gap-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h1

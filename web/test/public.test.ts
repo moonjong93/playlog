@@ -82,28 +82,83 @@ describe("공개 읽기", () => {
     expect(res.headers.get("content-type")).toContain("application/rss+xml");
     const xml = await res.text();
     expect(xml.startsWith("<?xml")).toBe(true);
-    expect(xml).toContain("<rss version=\"2.0\">");
+    expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("<item>");
     expect(xml).toContain("TGS 2026 현장 리포트");
-    expect(xml).toContain("<guid");
+    expect(xml).toContain("<guid isPermaLink=\"true\">http://localhost/s/tgs-2026-report</guid>");
+    expect(xml).toContain("<category>발표·신작</category>");
+    expect(xml).toContain('rel="self"');
   });
 
-  it("sitemap.xml은 전체 slug와 발행일을 담는다", async () => {
+  it("sitemap.xml은 기사·태그·OG 이미지를 담는다", async () => {
     const res = await app.request("/sitemap.xml");
     expect(res.status).toBe(200);
     const xml = await res.text();
     expect(xml).toContain("<urlset");
-    expect(xml).toContain("<loc>/s/tgs-2026-report</loc>");
-    expect(xml).toContain("<loc>/s/indie-ship</loc>");
+    expect(xml).toContain("<loc>http://localhost/s/tgs-2026-report</loc>");
+    expect(xml).toContain("<loc>http://localhost/s/indie-ship</loc>");
     expect(xml).toContain("<lastmod>");
+    expect(xml).toContain("<image:loc>http://localhost/og/s/tgs-2026-report.png</image:loc>");
+    expect(xml).toContain("<loc>http://localhost/?tag=");
   });
 
-  it("robots.txt는 sitemap을 안내한다", async () => {
+  it("sitemap-news.xml은 최근 48시간 기사만 담는다", async () => {
+    const now = new Date().toISOString();
+    insertArticle({ slug: "fresh-news", title: "방금 나온 소식", publishedAt: now });
+    insertArticle({
+      slug: "stale-news",
+      title: "오래된 소식",
+      publishedAt: new Date(Date.now() - 5 * 24 * 3600_000).toISOString(),
+    });
+    const res = await app.request("/sitemap-news.xml");
+    expect(res.status).toBe(200);
+    const xml = await res.text();
+    expect(xml).toContain("http://www.google.com/schemas/sitemap-news/0.9");
+    expect(xml).toContain("<news:title>방금 나온 소식</news:title>");
+    expect(xml).toContain("<news:language>ko</news:language>");
+    expect(xml).not.toContain("stale-news");
+  });
+
+  it("robots.txt는 검색 봇 허용·AI 학습 차단·sitemap 안내를 담는다", async () => {
     const res = await app.request("/robots.txt");
     expect(res.status).toBe(200);
     const text = await res.text();
+    expect(text).toContain("Content-Signal: ai-train=no, search=yes");
+    expect(text).toContain("User-agent: GPTBot");
     expect(text).toContain("User-agent: *");
     expect(text).toContain("Disallow: /internal/");
+    expect(text).toContain("Disallow: /search");
+    expect(text).toContain("Sitemap: http://localhost/sitemap.xml");
+    expect(text).toContain("Sitemap: http://localhost/sitemap-news.xml");
+  });
+
+  it("favicon·앱 아이콘·매니페스트를 서빙한다", async () => {
+    const svg = await app.request("/assets/favicon.svg");
+    expect(svg.status).toBe(200);
+    expect(svg.headers.get("content-type")).toContain("image/svg+xml");
+
+    const icon = await app.request("/assets/icon-192.png");
+    expect(icon.status).toBe(200);
+    expect(icon.headers.get("content-type")).toBe("image/png");
+    const bytes = new Uint8Array(await icon.arrayBuffer());
+    expect([...bytes.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const manifest = await app.request("/site.webmanifest");
+    expect(manifest.status).toBe(200);
+    expect(await manifest.text()).toContain('"name": "Ludus Digest"');
+  });
+
+  it("기사 OG 카드는 PNG로 나오고 없는 슬러그는 404", async () => {
+    const res = await app.request("/og/s/tgs-2026-report.png");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toContain("max-age=86400");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect([...bytes.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    expect((await app.request("/og/s/없는-기사.png")).status).toBe(404);
+    expect((await app.request("/og/default.png")).status).toBe(200);
+    expect((await app.request("/og/nope")).status).toBe(404);
   });
 
   it.skipIf(!hasHtmxAsset)("htmx 정적 파일을 로컬에서 서빙한다", async () => {

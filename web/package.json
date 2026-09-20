@@ -17,11 +17,13 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
+    "@resvg/resvg-js": "^2.6.2",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^17.2.3",
     "hono": "^4.9.9",
     "htmx.org": "4.0.0",
-    "sanitize-html": "^2.17.7"
+    "sanitize-html": "^2.17.7",
+    "satori": "^0.33.4"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.13",

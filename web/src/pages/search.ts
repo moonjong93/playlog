@@ -1,4 +1,5 @@
 import { html, raw } from "hono/html";
+import { NOINDEX } from "../site.ts";
 import {
   formatRelativeTime,
   formatTime,
@@ -159,6 +160,7 @@ export function searchPage(options: {
   q: string;
   tag: string;
   notice?: string;
+  origin?: string;
 }) {
   const params = new URLSearchParams();
   if (options.q) params.set("q", options.q);
@@ -167,9 +169,13 @@ export function searchPage(options: {
 
   return layout({
     title: options.q ? `${options.q} 검색 · Ludus Digest` : "검색 · Ludus Digest",
+    description: "Ludus Digest 기사 검색. 제목·요약·본문에서 키워드로 게임 업계 뉴스를 찾습니다.",
     current: "search",
     activeTag: options.tag,
     q: options.q,
+    origin: options.origin,
+    // 검색 결과는 색인하지 않는다(중복·얇은 페이지).
+    robots: NOINDEX,
     canonical: query ? `/search?${query}` : "/search",
     body: html`<div class="flex flex-col gap-5">
       <h1

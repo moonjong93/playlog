@@ -14,7 +14,7 @@ import { LEGACY_SECTION_TAGS, normalizeTags } from "./tags.ts";
 import { allTags, replaceTags, tagTotal, tagsFor } from "./tagStore.ts";
 import { PAGE_SIZE, feedPage } from "./pages/feed.ts";
 import { tagsPage } from "./pages/tags.ts";
-import { articlePage } from "./pages/article.ts";
+import { articlePage, type RelatedRow } from "./pages/article.ts";
 import {
   QUERY_MAX,
   QUERY_MIN,
@@ -43,6 +43,9 @@ import {
   pageNotFoundPage,
 } from "./pages/misc.ts";
 import { type ArticleRow } from "./pages/layout.ts";
+import { logoPng, logoSvg, manifestJson } from "./brand.ts";
+import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
+import { SITE_DESCRIPTION } from "./site.ts";
 
 type AppEnv = { Variables: { ip: string; sid: string } };
 
@@ -59,6 +62,30 @@ function nowIso(): string {
 
 function wantsPartial(c: Context): boolean {
   return c.req.header("HX-Request-Type") === "partial";
+}
+
+/** 절대 URL 기준. SITE_URL이 없으면 요청 origin을 쓴다(로컬 개발 포함). */
+function originOf(c: Context): string {
+  return env.siteUrl || new URL(c.req.url).origin;
+}
+
+/** 레이트 리밋을 적용하지 않는 정적·크롤러용 경로. */
+function isCacheableAsset(path: string): boolean {
+  return (
+    path.startsWith("/assets/") ||
+    path.startsWith("/og/") ||
+    path === "/favicon.ico" ||
+    path === "/robots.txt" ||
+    path === "/site.webmanifest" ||
+    path === "/sitemap.xml" ||
+    path === "/sitemap-news.xml"
+  );
+}
+
+function pngResponse(c: Context, png: Uint8Array, maxAge: number) {
+  c.header("Content-Type", "image/png");
+  c.header("Cache-Control", `public, max-age=${maxAge}, stale-while-revalidate=604800`);
+  return c.body(png as unknown as ArrayBuffer, 200);
 }
 
 function articleExists(slug: string): boolean {
@@ -119,6 +146,45 @@ function searchHits(q: string, tag: string): SearchHit[] {
   return query<SearchHit>(sql, params);
 }
 
+/** 같은 태그를 많이 공유하는 기사부터. 모자라면 최신 기사로 채운다(내부 링크). */
+function relatedArticles(slug: string, tags: string[], limit = 5): RelatedRow[] {
+  const out: RelatedRow[] = [];
+  const seen = new Set([slug]);
+  if (tags.length > 0) {
+    const marks = tags.map(() => "?").join(", ");
+    const rows = query<RelatedRow & { shared: number }>(
+      `SELECT a.slug, a.title_ko, a.published_at,
+          (SELECT COUNT(*) FROM article_tags t WHERE t.slug = a.slug AND t.tag IN (${marks}))
+            AS shared
+        FROM articles a
+        WHERE a.slug <> ?
+          AND EXISTS (
+            SELECT 1 FROM article_tags t WHERE t.slug = a.slug AND t.tag IN (${marks})
+          )
+        ORDER BY shared DESC, a.published_at DESC
+        LIMIT ?`,
+      [...tags, slug, ...tags, limit],
+    );
+    for (const row of rows) {
+      out.push({ slug: row.slug, title_ko: row.title_ko, published_at: row.published_at });
+      seen.add(row.slug);
+    }
+  }
+  if (out.length < limit) {
+    const fill = query<RelatedRow>(
+      "SELECT slug, title_ko, published_at FROM articles WHERE slug <> ? ORDER BY published_at DESC LIMIT ?",
+      [slug, limit * 2 + 1],
+    );
+    for (const row of fill) {
+      if (out.length >= limit) break;
+      if (seen.has(row.slug)) continue;
+      out.push(row);
+      seen.add(row.slug);
+    }
+  }
+  return out;
+}
+
 function xmlEscape(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -161,7 +227,7 @@ app.use("*", async (c, next) => {
 
 // 순서: health 예외 → clientIp/세션 확보 → Origin 검사(POST) → rate limit → 라우트
 app.use("*", async (c, next) => {
-  if (c.req.path === "/health") {
+  if (c.req.path === "/health" || isCacheableAsset(c.req.path)) {
     await next();
     return;
   }
@@ -222,7 +288,9 @@ app.get("/", (c) => {
      ORDER BY published_at DESC LIMIT ? OFFSET ?`,
     [...filter, PAGE_SIZE, (page - 1) * PAGE_SIZE],
   );
-  return c.html(feedPage({ articles: withTags(articles), tag, page, total }));
+  return c.html(
+    feedPage({ articles: withTags(articles), tag, page, total, origin: originOf(c) }),
+  );
 });
 
 app.get("/tags", (c) => {
@@ -234,6 +302,7 @@ app.get("/tags", (c) => {
       page,
       total: tagTotal(),
       activeTag: (c.req.query("tag") ?? "").trim(),
+      origin: originOf(c),
     }),
   );
 });
@@ -245,7 +314,7 @@ app.get("/search", (c) => {
   if (q.length === 0) notice = "검색어를 입력하세요.";
   else if (q.length < QUERY_MIN) notice = `${QUERY_MIN}자 이상 입력해 주세요.`;
   const hits = notice ? [] : withTags(searchHits(q, tag));
-  const options = { hits, q, tag, notice };
+  const options = { hits, q, tag, notice, origin: originOf(c) };
   return c.html(wantsPartial(c) ? searchResults(options) : searchPage(options));
 });
 
@@ -256,45 +325,59 @@ app.get("/s/:slug", (c) => {
     [slug],
   );
   if (!article) return c.html(notFoundPage(), 404);
+  const tagged = withTags([article])[0];
   return c.html(
     articlePage({
-      article: withTags([article])[0],
+      article: tagged,
       comments: commentsFor(slug),
       commentCount: commentTotal(slug),
       sessionId: c.get("sid"),
+      origin: originOf(c),
+      related: relatedArticles(slug, tagged.tags ?? []),
     }),
   );
 });
 
 app.get("/rss.xml", (c) => {
+  const origin = originOf(c);
   const articles = query<ArticleRow>(
     `SELECT ${ARTICLE_COLUMNS} FROM articles ORDER BY published_at DESC LIMIT 20`,
   );
+  const tags = tagsFor(articles.map((article) => article.slug));
   const items = articles
     .map((article) => {
-      const path = `/s/${encodeURIComponent(article.slug)}`;
+      const url = `${origin}/s/${encodeURIComponent(article.slug)}`;
       const date = new Date(article.published_at);
+      const pubDate = Number.isNaN(date.getTime())
+        ? xmlEscape(article.published_at)
+        : date.toUTCString();
+      const category = (tags.get(article.slug) ?? [])
+        .map((tag) => `      <category>${xmlEscape(tag)}</category>`)
+        .join("\n");
       return [
         "    <item>",
         `      <title>${xmlEscape(article.title_ko)}</title>`,
-        `      <link>${xmlEscape(env.siteUrl + path)}</link>`,
-        `      <guid isPermaLink="false">${xmlEscape(path)}</guid>`,
-        `      <pubDate>${
-          Number.isNaN(date.getTime()) ? xmlEscape(article.published_at) : date.toUTCString()
-        }</pubDate>`,
-        `      <description>${xmlEscape(article.lede_ko)}</description>`,
+        `      <link>${xmlEscape(url)}</link>`,
+        `      <guid isPermaLink="true">${xmlEscape(url)}</guid>`,
+        `      <pubDate>${pubDate}</pubDate>`,
+        `      <description>${xmlEscape(article.lede_ko || article.title_ko)}</description>`,
+        category,
         "    </item>",
-      ].join("\n");
+      ]
+        .filter((line) => line !== "")
+        .join("\n");
     })
     .join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Ludus Digest</title>
-    <link>${xmlEscape(env.siteUrl || "/")}</link>
-    <description>게임 업계 뉴스 다이제스트</description>
+    <title>Ludus Digest · 게임 업계 뉴스 다이제스트</title>
+    <link>${xmlEscape(`${origin}/`)}</link>
+    <atom:link href="${xmlEscape(`${origin}/rss.xml`)}" rel="self" type="application/rss+xml" />
+    <description>${xmlEscape(SITE_DESCRIPTION)}</description>
     <language>ko</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <ttl>30</ttl>
 ${items}
   </channel>
 </rss>
@@ -302,32 +385,169 @@ ${items}
   return c.body(body, 200, { "Content-Type": "application/rss+xml; charset=utf-8" });
 });
 
+type SitemapArticle = {
+  slug: string;
+  title_ko: string;
+  published_at: string;
+  updated_at: string;
+};
+
+function imageBlock(origin: string, slug: string, title: string): string {
+  const loc = xmlEscape(`${origin}/og/s/${encodeURIComponent(slug)}.png`);
+  return `    <image:image>
+      <image:loc>${loc}</image:loc>
+      <image:title>${xmlEscape(title)}</image:title>
+    </image:image>`;
+}
+
+/** 전체 URL 목록: 홈·태그 목록·태그 피드·기사(OG 이미지 포함). */
 app.get("/sitemap.xml", (c) => {
-  const rows = query<{ slug: string; published_at: string }>(
-    "SELECT slug, published_at FROM articles ORDER BY published_at DESC",
+  const origin = originOf(c);
+  const articles = query<SitemapArticle>(
+    "SELECT slug, title_ko, published_at, updated_at FROM articles ORDER BY published_at DESC",
   );
-  const urls = rows
-    .map((row) => {
-      const path = `/s/${encodeURIComponent(row.slug)}`;
-      return `  <url><loc>${xmlEscape(env.siteUrl + path)}</loc><lastmod>${xmlEscape(
-        row.published_at,
-      )}</lastmod></url>`;
+  const tags = query<{ tag: string; last: string }>(
+    `SELECT t.tag AS tag, MAX(a.updated_at) AS last
+     FROM article_tags t JOIN articles a ON a.slug = t.slug
+     GROUP BY t.tag ORDER BY last DESC`,
+  );
+
+  const entries: string[] = [];
+  const homeLast = articles[0]?.updated_at;
+  entries.push(
+    `  <url><loc>${xmlEscape(`${origin}/`)}</loc>${
+      homeLast ? `<lastmod>${xmlEscape(homeLast)}</lastmod>` : ""
+    }<changefreq>hourly</changefreq></url>`,
+  );
+  entries.push(
+    `  <url><loc>${xmlEscape(`${origin}/tags`)}</loc>${
+      homeLast ? `<lastmod>${xmlEscape(homeLast)}</lastmod>` : ""
+    }</url>`,
+  );
+  for (const row of tags) {
+    entries.push(
+      `  <url><loc>${xmlEscape(`${origin}/?tag=${encodeURIComponent(row.tag)}`)}</loc>` +
+        `<lastmod>${xmlEscape(row.last)}</lastmod></url>`,
+    );
+  }
+  for (const article of articles) {
+    entries.push(
+      `  <url>
+    <loc>${xmlEscape(`${origin}/s/${encodeURIComponent(article.slug)}`)}</loc>
+    <lastmod>${xmlEscape(article.updated_at || article.published_at)}</lastmod>
+${imageBlock(origin, article.slug, article.title_ko)}
+  </url>`,
+    );
+  }
+
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+${entries.join("\n")}
+</urlset>
+`;
+  return c.body(body, 200, { "Content-Type": "application/xml; charset=utf-8" });
+});
+
+/** Google 뉴스 사이트맵: 최근 48시간 기사만. */
+app.get("/sitemap-news.xml", (c) => {
+  const origin = originOf(c);
+  const cutoff = new Date(Date.now() - 48 * 3600_000).toISOString();
+  const articles = query<SitemapArticle>(
+    `SELECT slug, title_ko, published_at, updated_at FROM articles
+     WHERE datetime(published_at) >= datetime(?)
+     ORDER BY published_at DESC LIMIT 1000`,
+    [cutoff],
+  );
+  const urls = articles
+    .map((article) => {
+      const path = `/s/${encodeURIComponent(article.slug)}`;
+      return `  <url>
+    <loc>${xmlEscape(origin + path)}</loc>
+    <news:news>
+      <news:publication>
+        <news:name>Ludus Digest</news:name>
+        <news:language>ko</news:language>
+      </news:publication>
+      <news:publication_date>${xmlEscape(article.published_at)}</news:publication_date>
+      <news:title>${xmlEscape(article.title_ko)}</news:title>
+    </news:news>
+${imageBlock(origin, article.slug, article.title_ko)}
+  </url>`;
     })
     .join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls}
 </urlset>
 `;
   return c.body(body, 200, { "Content-Type": "application/xml; charset=utf-8" });
 });
 
+/** 검색·미리보기 봇은 허용하고 AI 학습 수집과 저가치 SEO 크롤러는 막는다. */
+const AI_TRAINING_BOTS = [
+  "GPTBot",
+  "ClaudeBot",
+  "anthropic-ai",
+  "Google-Extended",
+  "Applebot-Extended",
+  "Amazonbot",
+  "Bytespider",
+  "CCBot",
+  "AI2Bot",
+  "cohere-ai",
+  "FacebookBot",
+  "meta-externalagent",
+  "ImagesiftBot",
+  "omgili",
+  "omgilibot",
+];
+const AI_SEARCH_BOTS = [
+  "OAI-SearchBot",
+  "ChatGPT-User",
+  "Claude-SearchBot",
+  "Claude-User",
+  "PerplexityBot",
+  "GoogleOther",
+];
+const LOW_VALUE_BOTS = [
+  "AhrefsBot",
+  "SemrushBot",
+  "SemrushBot-BA",
+  "MJ12bot",
+  "DotBot",
+  "PetalBot",
+  "DataForSeoBot",
+  "SERankingBacklinksBot",
+  "Baiduspider",
+];
+
+function botGroup(bots: string[], rule: "Allow: /" | "Disallow: /"): string {
+  return [...bots.map((bot) => `User-agent: ${bot}`), rule].join("\n");
+}
+
 app.get("/robots.txt", (c) => {
-  const lines = ["User-agent: *", "Allow: /", "Disallow: /internal/"];
-  if (env.siteUrl) lines.push(`Sitemap: ${env.siteUrl}/sitemap.xml`);
-  return c.body(`${lines.join("\n")}\n`, 200, {
-    "Content-Type": "text/plain; charset=utf-8",
-  });
+  const origin = originOf(c);
+  const body = [
+    "Content-Signal: ai-train=no, search=yes, ai-input=yes",
+    "",
+    "# AI 학습용 수집기는 막고, 검색·사용자 요청 봇은 허용한다.",
+    botGroup(AI_TRAINING_BOTS, "Disallow: /"),
+    "",
+    botGroup(AI_SEARCH_BOTS, "Allow: /"),
+    "",
+    "# 저가치 SEO 크롤러.",
+    botGroup(LOW_VALUE_BOTS, "Disallow: /"),
+    "",
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /internal/",
+    "Disallow: /search",
+    "",
+    `Sitemap: ${origin}/sitemap.xml`,
+    `Sitemap: ${origin}/sitemap-news.xml`,
+    "",
+  ].join("\n");
+  return c.body(body, 200, { "Content-Type": "text/plain; charset=utf-8" });
 });
 
 let htmxAsset: string | null | undefined;
@@ -343,6 +563,48 @@ app.get("/assets/htmx.min.js", (c) => {
   if (!htmxAsset) return c.text("htmx 파일을 찾을 수 없습니다.", 404);
   c.header("Cache-Control", "no-cache");
   return c.body(htmxAsset, 200, { "Content-Type": "text/javascript; charset=utf-8" });
+});
+
+const ICON_MAX_AGE = 30 * 24 * 3600;
+
+app.get("/assets/favicon.svg", (c) => {
+  c.header("Cache-Control", `public, max-age=${ICON_MAX_AGE}`);
+  return c.body(logoSvg(64), 200, { "Content-Type": "image/svg+xml; charset=utf-8" });
+});
+
+for (const [path, size] of [
+  ["/assets/icon-192.png", 192],
+  ["/assets/icon-512.png", 512],
+  ["/assets/apple-touch-icon.png", 180],
+  ["/favicon.ico", 48],
+] as const) {
+  app.get(path, (c) => pngResponse(c, logoPng(size), ICON_MAX_AGE));
+}
+
+app.get("/site.webmanifest", (c) => {
+  c.header("Cache-Control", `public, max-age=${ICON_MAX_AGE}`);
+  return c.body(manifestJson(), 200, {
+    "Content-Type": "application/manifest+json; charset=utf-8",
+  });
+});
+
+/** 기사 OG 카드. `/og/s/:slug.png` 와 사이트 기본 카드 `/og/default.png`. */
+app.get("/og/*", async (c) => {
+  const rest = c.req.path.slice("/og/".length);
+  if (rest === "default.png" || rest === "") {
+    return pngResponse(c, await ogPng(DEFAULT_OG_KEY, defaultOgCard()), 3600);
+  }
+  if (!rest.startsWith("s/") || !rest.endsWith(".png")) {
+    return c.text("not found", 404);
+  }
+  const slug = decodeURIComponent(rest.slice(2, -4));
+  const article = queryOne<ArticleRow>(
+    `SELECT ${ARTICLE_COLUMNS} FROM articles WHERE slug = ?`,
+    [slug],
+  );
+  if (!article) return c.text("not found", 404);
+  const card = articleOgCard(withTags([article])[0]);
+  return pngResponse(c, await ogPng(`${slug}@${article.updated_at}`, card), 86400);
 });
 
 app.post("/s/:slug/comments", async (c) => {

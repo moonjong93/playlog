@@ -1,4 +1,6 @@
 import { html } from "hono/html";
+import { itemListJsonLd } from "../seo.ts";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "../site.ts";
 import {
   formatRelativeTime,
   formatTime,
@@ -90,6 +92,7 @@ export function feedPage(options: {
   tag: string;
   page: number;
   total: number;
+  origin?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(options.total / PAGE_SIZE));
   const empty = options.tag
@@ -110,18 +113,52 @@ export function feedPage(options: {
     ${options.articles.map((article) => feedCard(article))}
   </div>`;
 
-  const title = options.tag ? `#${options.tag} · Ludus Digest` : "Ludus Digest";
+  const title = options.tag
+    ? `#${options.tag} · Ludus Digest`
+    : options.page > 1
+    ? `전체 기사 ${options.page}페이지 · Ludus Digest`
+    : `${SITE_NAME} · ${SITE_TAGLINE}`;
+  const heading = options.tag ? `태그 #${options.tag}` : SITE_TAGLINE;
+  const description = options.tag
+    ? `#${options.tag} 태그로 모은 게임 업계 뉴스 ${options.total}건. 요약과 출처, 사용자 반응을 함께 봅니다.`
+    : SITE_DESCRIPTION;
+  const first = (options.page - 1) * PAGE_SIZE + 1;
+  const last = first + Math.max(options.articles.length - 1, 0);
+  const listLabel = options.tag
+    ? `#${options.tag} 태그 기사`
+    : "Ludus Digest 최신 기사";
+  const jsonLd =
+    options.articles.length === 0 || !options.origin
+      ? []
+      : [
+        itemListJsonLd({
+          origin: options.origin,
+          name: options.page > 1 ? `${listLabel} (${first}-${last})` : listLabel,
+          items: options.articles.map((article) => ({
+            slug: article.slug,
+            title: article.title_ko,
+          })),
+        }),
+      ];
 
   return layout({
     title,
+    description,
     current: "feed",
     activeTag: options.tag,
-    canonical: options.tag ? `/?tag=${encodeURIComponent(options.tag)}` : "/",
+    canonical: feedHref(options.tag, options.page),
+    origin: options.origin,
     ogType: "website",
+    jsonLd,
+    prevPath: options.page > 1 ? feedHref(options.tag, options.page - 1) : undefined,
+    nextPath: options.page < totalPages ? feedHref(options.tag, options.page + 1) : undefined,
     body: html`<div class="flex flex-col gap-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <span class="text-label-ui font-label-ui text-on-surface-variant"
-          >${options.tag ? html`태그 <span class="text-primary font-semibold">#${options.tag}</span>` : "전체 기사"}</span
+        <h1
+          class="text-label-ui font-label-ui text-on-surface-variant"
+          >${options.tag
+      ? html`태그 <span class="text-primary font-semibold">#${options.tag}</span>`
+      : heading}</h1
         >
         <span class="text-label-mono-sm font-label-mono-sm text-outline"
           >${options.total}건</span

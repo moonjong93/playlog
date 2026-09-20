@@ -94,12 +94,26 @@ describe("피드/기사", () => {
     expect(html).toContain('<meta property="og:title"');
     expect(html).toContain('<meta property="og:type" content="article" />');
     expect(html).toContain('<meta property="article:published_time"');
-    expect(html).toContain('<link rel="canonical" href="/s/page-01" />');
+    expect(html).toContain('<link rel="canonical" href="http://localhost/s/page-01" />');
+    expect(html).toContain(
+      '<meta property="og:image" content="http://localhost/og/s/page-01.png" />',
+    );
+    expect(html).toContain('"@type":"NewsArticle"');
   });
 
   it("태그 피드 canonical에 태그가 들어간다", async () => {
     const hash = encodeURIComponent("출시·패치");
     const html = await (await app.request(`/?tag=${hash}`)).text();
-    expect(html).toContain(`<link rel="canonical" href="/?tag=${hash}" />`);
+    expect(html).toContain(`<link rel="canonical" href="http://localhost/?tag=${hash}" />`);
+  });
+
+  it("검색 페이지는 noindex", async () => {
+    const html = await (await app.request("/search?q=TGS")).text();
+    expect(html).toContain('<meta name="robots" content="noindex, follow" />');
+  });
+
+  it("2페이지에는 prev 링크가 붙는다", async () => {
+    const html = await (await app.request("/?page=2")).text();
+    expect(html).toContain('<link rel="prev" href="http://localhost/" />');
   });
 });
