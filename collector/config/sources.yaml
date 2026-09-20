@@ -1,0 +1,113 @@
+# sources.yaml
+#
+# DB(sources)에 반영할 피드 목록. `news sources sync` 로 upsert 한다.
+# weight: 중요도 계산용. 공식 채널 > 주요 매체 > 집계/블로그.
+# enabled: false 로 두면 Collector가 건너뛴다(DB의 enabled 값이 우선).
+
+sources:
+  # ---- 공식 채널 (weight 1.5) ----
+  - name: PlayStation Blog
+    feed_url: https://blog.playstation.com/feed/
+    weight: 1.5
+    lang: en
+  - name: Xbox Wire
+    feed_url: https://news.xbox.com/en-us/feed/
+    weight: 1.5
+    lang: en
+  - name: Steam News
+    feed_url: https://store.steampowered.com/feeds/news.xml
+    weight: 1.5
+    lang: en
+  - name: Nintendo Everything
+    feed_url: https://nintendoeverything.com/feed/
+    weight: 0.8
+    lang: en
+
+  # ---- 주요 매체 (weight 1.0) ----
+  - name: PC Gamer
+    feed_url: https://www.pcgamer.com/rss/
+    weight: 1.0
+    lang: en
+  - name: IGN
+    feed_url: https://feeds.ign.com/ign/all
+    weight: 1.0
+    lang: en
+  - name: GameSpot
+    feed_url: https://www.gamespot.com/feeds/mashup/
+    weight: 1.0
+    lang: en
+  - name: Eurogamer
+    feed_url: https://www.eurogamer.net/feed
+    weight: 1.0
+    lang: en
+    enabled: false           # 실측: TCP reset(UA·TLS 지문 무관). 네트워크 레벨 차단으로 보임
+  - name: Polygon
+    feed_url: https://www.polygon.com/rss/index.xml
+    weight: 1.0
+    lang: en
+  - name: Gematsu
+    feed_url: https://www.gematsu.com/feed
+    weight: 1.0
+    lang: en
+  - name: Siliconera
+    feed_url: https://www.siliconera.com/feed/
+    weight: 1.0
+    lang: en
+  - name: Push Square
+    feed_url: https://www.pushsquare.com/feeds/latest
+    weight: 1.0
+    lang: en
+
+  # ---- 보조 / 집계 (weight 0.8) ----
+  - name: Rock Paper Shotgun
+    feed_url: https://www.rockpapershotgun.com/feed
+    weight: 0.8
+    lang: en
+  - name: VG247
+    feed_url: https://www.vg247.com/feed
+    weight: 0.8
+    lang: en
+  - name: PCGamesN
+    feed_url: https://www.pcgamesn.com/feed
+    weight: 0.8
+    lang: en
+  - name: Nintendo Life
+    feed_url: https://www.nintendolife.com/feeds/latest
+    weight: 0.8
+    lang: en
+  - name: Automaton
+    feed_url: https://automaton-media.com/feed/
+    weight: 1.0
+    lang: ja
+  - name: 4Gamer
+    feed_url: https://www.4gamer.net/rss/index.xml
+    weight: 0.8
+    lang: ja
+
+
+  # ---- Reddit ----
+  # 공식 API 는 신규 앱이 막혀 있다. 익명 .rss 는 1 req/min.
+  # 인증은 .env 의 REDDIT_USER / REDDIT_FEED (prefs/feeds 의 쿼리값) 로 붙인다.
+  #   upvoted.rss 같은 개인 피드를 소스로 쓰지 않는다. 파라미터만 재사용.
+  # UA 의 /u/ 는 실제 계정이어야 한다.
+  - name: Reddit r/gaming (top/day)
+    feed_url: https://www.reddit.com/r/gaming/top/.rss?t=day&limit=50
+    weight: 0.8
+    lang: en
+    user_agent: linux:news-collector:0.1 (by /u/FUAlreadyUsedName)
+    impersonate: safari
+    kind: community
+  - name: Reddit r/Games (top/day)
+    feed_url: https://www.reddit.com/r/Games/top/.rss?t=day&limit=50
+    weight: 0.9
+    lang: en
+    user_agent: linux:news-collector:0.1 (by /u/FUAlreadyUsedName)
+    impersonate: safari
+    kind: community
+  - name: Reddit r/pcgaming (top/day)
+    feed_url: https://www.reddit.com/r/pcgaming/top/.rss?t=day&limit=50
+    weight: 0.8
+    lang: en
+    user_agent: linux:news-collector:0.1 (by /u/FUAlreadyUsedName)
+    impersonate: safari
+    kind: community

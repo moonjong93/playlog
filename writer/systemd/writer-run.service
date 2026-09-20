@@ -1,0 +1,17 @@
+[Unit]
+Description=writer — 수집본 RAG + OpenRouter 한글 기사 (3시간 주기)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Develop/news/writer
+ExecStart=%h/Develop/news/writer/.venv/bin/writer run --interval 10800
+Restart=always
+RestartSec=30
+Nice=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

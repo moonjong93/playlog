@@ -1,0 +1,45 @@
+# 노이즈 1차 필터 — 규칙만. LLM 없음.
+#
+# 목적: writer(클라우드)에 넘길 토큰을 줄이고, 게임과 무관한 기사를 미리 표시한다.
+#       삭제하지 않고 raw_items.status='filtered' + noise_reason 만 남긴다.
+#       (writer 가 근거를 보고 되살릴 수 있어야 하므로)
+#
+# 적용 순서
+#   1. allow_sources 에 있으면 무조건 보존
+#   2. title_allow 에 걸리면 보존  (게임 기사 신호, 제목+요약 검사)
+#   3. title_deny 가 **제목에** 걸리면 filtered  ← 요약은 보지 않는다
+#   4. 아무것도 아니면 보존 (기본은 보존 — 누락이 오탐보다 위험)
+#
+# deny 를 제목만 보는 이유: 요약까지 보면 요약에 'movie' 한 단어만 있어도
+#   게임 기사가 걸러진다(실측 오탐: 'Marvel's Wolverine makes me ask a serious question.')
+
+# 공식 채널은 절대 거르지 않는다
+allow_sources:
+  - PlayStation Blog
+  - Xbox Wire
+  - Steam News
+
+# 이 패턴이 제목/요약에 있으면 살린다 (deny 보다 우선)
+# 주의: 'game' 같은 광범위한 단어를 넣으면 'game deals' 가 통과해 버린다. 구체적 신호만.
+title_allow:
+  - '(?i)\b(remake|remaster|dlc|expansion|patch notes|update \d|trailer|release date|launch(es|ed)?|demo|open beta|season pass|battle pass|esports|gameplay|developer|studio|franchise|roadmap)\b'
+  - '(?i)(ゲーム|アップデート|配信|リリース|発売)'
+
+# 이 패턴이 제목에 걸리면 filtered (요약은 검사하지 않는다)
+# 한계: 게임과 무관한 영화·TV 기사라도 키워드가 없으면 걸리지 않는다.
+#       여기서는 명백한 것만 거르고, 나머지는 writer 가 판단한다.
+title_deny:
+  - name: 리딤코드·쿠폰
+    pattern: '(?i)\b(redeem|coupons?|promo codes?|free codes?|gift codes?)\b'
+  # 'Genshin Impact codes (September 2026)' 같은 코드 목록 글.
+  # deny 를 제목만 보게 바꾸면서 요약으로 걸리던 것들이 살아나서 제목 패턴을 보강했다.
+  - name: 리딤코드 목록
+    pattern: '(?i)\bcodes?\b\s*\([A-Za-z]+ 20\d\d\)'
+  - name: 단순 할인·딜
+    pattern: '(?i)\b(deals?|discounts?|on sale|% off|price drop|cheapest)\b'
+  - name: 영화·TV (게임 무관)
+    pattern: '(?i)\b(movies?|box office|netflix|hbo|disney\+|tv series|episode \d+|season \d+ (review|recap|finale))\b'
+  - name: 사이트 공지
+    pattern: '(?i)\b(site news|we are hiring|newsletter|subscribe to|maintenance window)\b'
+  - name: 스포츠·정치
+    pattern: '(?i)\b(election|politics|football|soccer|basketball)\b'

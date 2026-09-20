@@ -1,0 +1,52 @@
+[project]
+name = "collector"
+version = "0.1.0"
+description = "RSS/Reddit 수집 + 관리 전용 (LLM 없음, 임베딩만 사용)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "feedparser>=6.0.11",
+    "PyYAML>=6.0",
+    "curl_cffi>=0.7",
+]
+
+[project.optional-dependencies]
+# 로컬 임베딩(기본 백엔드). collect/noise/report 만 쓸 때는 필요 없다.
+# transformers 5.x 는 이 모델의 커스텀 코드와 안 맞는다(실측: _noncausal_shortconv_forward() seq_idx).
+# 모델이 transformers 4.56 기준으로 작성되어 있고 sentence-transformers 5.x 조합도 이쪽이다.
+local-embed = [
+    "sentence-transformers>=5.1,<6",
+    "transformers>=4.56,<5",
+    "torch>=2.9",
+]
+
+[project.scripts]
+collector = "collector.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/collector"]
+
+# Linux(N100) 에서 torch 를 PyPI 기본값으로 받으면 CUDA 라이브러리로 2GB+ 가 된다.
+# CPU 휠만 있는 인덱스를 Linux 에서만 쓰게 한다(그 인덱스에는 macOS 휠이 없다).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

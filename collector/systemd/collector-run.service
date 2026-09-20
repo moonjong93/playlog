@@ -1,0 +1,18 @@
+[Unit]
+Description=collector — RSS/Reddit 수집 + 노이즈 필터 + 임베딩 (15분 주기)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Develop/news/collector
+ExecStart=%h/Develop/news/collector/.venv/bin/collector run --interval 900
+Restart=always
+RestartSec=30
+# N100 같은 저전력 장비에서 수집기가 우선순위를 양보하도록
+Nice=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

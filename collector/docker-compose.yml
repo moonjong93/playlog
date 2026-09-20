@@ -1,0 +1,25 @@
+# collector 배포용 (미니 PC / N100)
+#
+#   docker compose up -d --build
+#
+# 임베딩은 collector 컨테이너 안에서 직접 돈다(sentence-transformers).
+# 별도 임베딩 서버 컨테이너는 없다. 모델은 첫 실행 때 HF 에서 받아
+# ./data/hf-cache 에 캐시된다(볼륨에 남으므로 재생성해도 다시 안 받는다).
+
+name: collector
+
+services:
+  collector:
+    build: .
+    image: collector:local
+    container_name: collector
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    environment:
+      COLLECTOR_DB: /app/data/news.db
+      SOURCES_FILE: /app/config/sources.yaml
+      NOISE_RULES: /app/config/noise_rules.yaml
+      HF_HOME: /app/data/hf-cache
+      COLLECT_INTERVAL: "900"
