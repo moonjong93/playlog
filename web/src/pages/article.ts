@@ -12,33 +12,21 @@ import {
 } from "./layout.ts";
 import { commentSection, type CommentRow } from "./comments.ts";
 
-/**
- * 커뮤니티 소스 이름을 표시용 짧은 라벨로 줄인다.
- * `Reddit r/Games (top/day)` -> `r/Games`. 모양이 다르면 원문 그대로 둔다(표시 전용).
- */
-export function communitySourceLabel(name: string | undefined): string {
-  const trimmed = name?.trim() ?? "";
-  const match = /^Reddit\s+(.+?)\s*\([^)]*\)$/.exec(trimmed);
-  return match ? match[1].trim() : trimmed;
-}
-
-function communityQuotes(
-  json: string,
-): { author: string; text: string; source: string }[] {
-  const out: { author: string; text: string; source: string }[] = [];
+/** 사용자 반응에 넣을 인용. 레딧 글 순서를 유지하고 최대 6개. */
+function communityQuotes(json: string): { text: string }[] {
+  const out: { text: string }[] = [];
   for (const source of articleSources(json)) {
-    const label = communitySourceLabel(source.name);
     for (const row of source.comments || []) {
       const text = row.text?.trim();
       if (!text) continue;
-      out.push({ author: row.author?.trim() || "anon", text, source: label });
+      out.push({ text });
       if (out.length >= 6) return out;
     }
   }
   return out;
 }
 
-/** 출처 인용("커뮤니티 반응"). 사용자 댓글과는 별개 섹션이다. */
+/** 사용자 반응(레딧 인용). 사용자 댓글과는 별개 섹션이다. */
 function communityBox(json: string) {
   const quotes = communityQuotes(json);
   if (quotes.length === 0) return "";
@@ -48,28 +36,13 @@ function communityBox(json: string) {
     <h2
       class="mb-3 text-label-ui font-label-ui font-semibold tracking-wider text-secondary"
     >
-      커뮤니티 반응
+      사용자 반응
     </h2>
-    <ul class="space-y-2.5">
+    <ul class="space-y-1.5 text-body-sm font-body-sm text-on-surface-variant">
       ${quotes.map(
-    (q) => html`<li
-          class="bg-surface-container-low border border-outline-variant rounded p-3.5"
-        >
-          <div class="flex flex-wrap items-center gap-2 min-w-0 mb-1.5">
-            <span class="text-label-ui font-label-ui font-semibold text-on-surface"
-              >u/${q.author}</span
-            >
-            ${q.source
-          ? html`<span class="text-label-mono-sm font-label-mono-sm text-outline"
-                    >${q.source}</span
-                  >`
-          : ""}
-          </div>
-          <p
-            class="text-body-sm font-body-sm text-on-surface-variant whitespace-pre-wrap break-words"
-          >
-            ${q.text}
-          </p>
+    (q) => html`<li class="flex items-start gap-2">
+          <span class="text-secondary font-bold select-none">-</span>
+          <span class="whitespace-pre-wrap break-words">${q.text}</span>
         </li>`,
   )}
     </ul>

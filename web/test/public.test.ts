@@ -44,10 +44,11 @@ describe("공개 읽기", () => {
     expect((await app.request("/search?q=TGS")).status).toBe(200);
   });
 
-  it("기사 상세에 출처/커뮤니티 인용/요약 박스/태그 칩이 그대로 나온다", async () => {
+  it("기사 상세에 출처/사용자 반응/요약 박스/태그 칩이 그대로 나온다", async () => {
     const html = await (await app.request("/s/tgs-2026-report")).text();
-    expect(html).toContain("커뮤니티 반응");
-    expect(html).toContain("u/neogaf_user");
+    expect(html).toContain("사용자 반응");
+    expect(html).toContain("부스가 정말 컸다");
+    expect(html).not.toContain("u/neogaf_user");
     expect(html).toContain("출처");
     expect(html).toContain("summary-box");
     expect(html).toContain("Famitsu");

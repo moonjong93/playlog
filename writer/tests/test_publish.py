@@ -139,3 +139,18 @@ def test_render_markdown_front_matter_tags():
     assert "tags: []" in render_markdown(**kwargs, tags=[])
     # 재발행(tags=None)은 웹의 기존 태그를 모르므로 front matter 에도 쓰지 않는다.
     assert "tags:" not in render_markdown(**kwargs, tags=None)
+
+
+def test_ingest_payload_drops_markdown_headings():
+    """예전 기사에 남은 '### 커뮤니티 반응' 헤딩이 본문에 노출되지 않는다."""
+    base = dict(
+        slug="s", title="제목", lede="리드", published_at="2026-09-20T00:00:00Z",
+        story_id=1, sources=[],
+    )
+    payload = ingest_payload(
+        **base,
+        body_md="본문 첫 문단이다.\n\n### 커뮤니티 반응\n\n반응 요약 문단이다.",
+    )
+    assert "###" not in payload["body_html"]
+    assert "커뮤니티 반응" not in payload["body_html"]
+    assert "반응 요약 문단이다" in payload["body_html"]

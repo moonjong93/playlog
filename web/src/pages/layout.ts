@@ -76,9 +76,14 @@ export function formatRelativeTime(iso: string): string {
   return formatTime(iso);
 }
 
+/** 피드 이름 꼬리표를 떼어낸 표시용 이름. `Reddit r/Games (top/day)` → `Reddit r/Games`. */
+export function displaySourceName(name: string): string {
+  return name.replace(/\s*\(top\/[a-z]+\)\s*$/i, "").trim() || name.trim();
+}
+
 function sourceLabel(source: Source): string {
   const name = source.name?.trim();
-  if (name) return name;
+  if (name) return displaySourceName(name);
   if (source.url) {
     try {
       return new URL(source.url).hostname.replace(/^www\./, "");

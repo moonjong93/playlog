@@ -109,6 +109,15 @@ def write_file(out_dir: Path, *, date: str, slug: str, text: str) -> Path:
 _LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)]+)\)")
 _I = re.compile(r"\*(.+?)\*")
 _HREF = re.compile(r"https?://[^\s)>\"]+")
+_MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+.*$", re.M)
+
+
+def drop_markdown_headings(md: str) -> str:
+    """md_to_html 이 지원하지 않는 마크다운 제목 줄을 버린다(프롬프트에서도 금지).
+
+    예전에 모델이 넣은 '### 커뮤니티 반응' 같은 줄이 본문에 그대로 노출되던 문제 정리용.
+    """
+    return _MD_HEADING.sub("", md or "")
 
 
 def md_to_html(text: str) -> str:
@@ -193,6 +202,7 @@ def ingest_payload(*, slug: str, title: str, lede: str, body_md: str,
     body_md = unescape_newlines(body_md)
     body_md = _drop_lede_echo(body_md, lede)
     body_md = prose_body(body_md, sources)
+    body_md = drop_markdown_headings(body_md)
     payload = {
         "slug": slug,
         "title_ko": title,
