@@ -1,5 +1,6 @@
 import { html } from "hono/html";
 import type { TagStat } from "../tagStore.ts";
+import { SITE_NAME } from "../site.ts";
 import { TAGS_PAGE_SIZE } from "../tags.ts";
 import { pagination } from "./feed.ts";
 import { formatRelativeTime, formatTime, layout } from "./layout.ts";
@@ -53,8 +54,8 @@ export function tagsPage(options: {
   </ul>`;
 
   return layout({
-    title: "태그 · Ludus Digest",
-    description: `Ludus Digest에 쌓인 태그 ${options.total}개. 태그를 고르면 해당 주제의 게임 업계 뉴스만 모아 봅니다.`,
+    title: `태그 · ${SITE_NAME}`,
+    description: `${SITE_NAME}에 모인 태그 ${options.total}개. 태그를 고르면 해당 주제의 게임 업계 뉴스만 모아 봅니다.`,
     current: "tags",
     activeTag: options.activeTag,
     canonical: tagsHref(options.page),

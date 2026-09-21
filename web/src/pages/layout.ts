@@ -2,11 +2,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { html, raw } from "hono/html";
 import { env, rootDir } from "../env.ts";
+import { logoSvg } from "../brand.ts";
 import { recentTags } from "../tagStore.ts";
 import { organizationJsonLd, websiteJsonLd } from "../seo.ts";
-import { DEFAULT_OG_PATH, ROBOTS_DEFAULT, SITE_NAME, absoluteUrl, jsonLd } from "../site.ts";
+import {
+  DEFAULT_OG_PATH,
+  ROBOTS_DEFAULT,
+  SITE_NAME,
+  SITE_TAGLINE,
+  absoluteUrl,
+  jsonLd,
+} from "../site.ts";
 
-export { DEFAULT_OG_PATH, SITE_NAME, absoluteUrl };
+export { DEFAULT_OG_PATH, SITE_NAME, SITE_TAGLINE, absoluteUrl };
 
 const FALLBACK_CSS = `body{background:#0f131d;color:#dfe2f1;font-family:Inter,sans-serif;margin:0}`;
 
@@ -222,7 +230,7 @@ function siteHeader(options: {
     : "";
   const inputHx = searching
     ? ` hx-action="/search" hx-method="get" hx-trigger="input changed delay:300ms"` +
-      ` hx-target="#search-results" hx-push-url="true" hx-include="closest form"`
+    ` hx-target="#search-results" hx-push-url="true" hx-include="closest form"`
     : "";
 
   return html`<header
@@ -231,21 +239,15 @@ function siteHeader(options: {
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-6">
       <div class="flex items-center gap-8 min-w-0">
         <a class="flex items-center gap-2.5 group shrink-0" href="/">
-          <div
-            class="w-8 h-8 rounded bg-surface-container-high border border-outline-variant flex items-center justify-center text-primary group-hover:border-primary transition-colors"
-          >
-            <span class="material-symbols-outlined text-primary text-[20px]"
-              >terminal</span
-            >
-          </div>
+          ${raw(logoSvg(34))}
           <div class="flex flex-col">
             <span
               class="text-headline-sm font-headline-sm font-bold text-on-surface tracking-tight leading-none"
-              >Ludus Digest</span
+              >${SITE_NAME}</span
             >
             <span
               class="text-label-mono-sm font-label-mono-sm text-outline tracking-wider mt-0.5"
-              >루두스 다이제스트</span
+              >${SITE_TAGLINE}</span
             >
           </div>
         </a>
@@ -258,7 +260,6 @@ function siteHeader(options: {
     ),
   )}
           ${navLink("/tags", "전체보기", options.current === "tags")}
-          ${navLink("/rss.xml", "RSS", false)}
         </nav>
       </div>
       <div class="flex items-center gap-3 shrink-0">
@@ -286,8 +287,8 @@ function siteHeader(options: {
             ${raw(inputHx)}
           />
           ${activeTag
-            ? html`<input type="hidden" name="tag" value="${activeTag}" />`
-            : ""}
+      ? html`<input type="hidden" name="tag" value="${activeTag}" />`
+      : ""}
           <div
             class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none"
           >
@@ -318,10 +319,10 @@ function siteFooter() {
     >
       <div class="flex flex-col md:flex-row items-center gap-4">
         <span class="text-label-mono-md font-label-mono-md font-bold text-on-surface"
-          >Ludus Digest</span
+          >${SITE_NAME}</span
         >
         <span class="text-body-sm font-body-sm text-outline text-center md:text-left">
-          High-density intelligence for the gaming industry. Powered by AI Summaries.
+          게임 업계 뉴스와 해외 반응을 매일 한국어로 정리합니다. Powered by AI Summaries.
         </span>
       </div>
     </div>

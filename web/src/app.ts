@@ -45,7 +45,7 @@ import {
 import { type ArticleRow } from "./pages/layout.ts";
 import { logoPng, logoSvg, manifestJson } from "./brand.ts";
 import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
-import { SITE_DESCRIPTION } from "./site.ts";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "./site.ts";
 
 type AppEnv = { Variables: { ip: string; sid: string } };
 
@@ -152,18 +152,16 @@ function relatedArticles(slug: string, tags: string[], limit = 5): RelatedRow[] 
   const seen = new Set([slug]);
   if (tags.length > 0) {
     const marks = tags.map(() => "?").join(", ");
+    // 태그에서 출발해야 idx_article_tags_tag를 쓴다(기사 전체 스캔 방지).
     const rows = query<RelatedRow & { shared: number }>(
-      `SELECT a.slug, a.title_ko, a.published_at,
-          (SELECT COUNT(*) FROM article_tags t WHERE t.slug = a.slug AND t.tag IN (${marks}))
-            AS shared
-        FROM articles a
-        WHERE a.slug <> ?
-          AND EXISTS (
-            SELECT 1 FROM article_tags t WHERE t.slug = a.slug AND t.tag IN (${marks})
-          )
+      `SELECT a.slug, a.title_ko, a.published_at, COUNT(*) AS shared
+        FROM article_tags t
+        JOIN articles a ON a.slug = t.slug
+        WHERE t.tag IN (${marks}) AND t.slug <> ?
+        GROUP BY t.slug
         ORDER BY shared DESC, a.published_at DESC
         LIMIT ?`,
-      [...tags, slug, ...tags, limit],
+      [...tags, slug, limit],
     );
     for (const row of rows) {
       out.push({ slug: row.slug, title_ko: row.title_ko, published_at: row.published_at });
@@ -371,7 +369,7 @@ app.get("/rss.xml", (c) => {
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Ludus Digest · 게임 업계 뉴스 다이제스트</title>
+    <title>${xmlEscape(SITE_NAME)} · ${xmlEscape(SITE_TAGLINE)}</title>
     <link>${xmlEscape(`${origin}/`)}</link>
     <atom:link href="${xmlEscape(`${origin}/rss.xml`)}" rel="self" type="application/rss+xml" />
     <description>${xmlEscape(SITE_DESCRIPTION)}</description>
@@ -465,7 +463,7 @@ app.get("/sitemap-news.xml", (c) => {
     <loc>${xmlEscape(origin + path)}</loc>
     <news:news>
       <news:publication>
-        <news:name>Ludus Digest</news:name>
+        <news:name>${xmlEscape(SITE_NAME)}</news:name>
         <news:language>ko</news:language>
       </news:publication>
       <news:publication_date>${xmlEscape(article.published_at)}</news:publication_date>

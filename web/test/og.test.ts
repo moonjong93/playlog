@@ -74,11 +74,13 @@ describe("아이콘", () => {
     const png = logoPng(192);
     expect([...png.slice(0, 8)]).toEqual(PNG_SIGNATURE);
     expect(logoPng(192)).toBe(png); // 캐시
+    // 클립/그라디언트가 깨져 빈 이미지가 나오면 훨씬 작아진다.
+    expect(logoPng(512).length).toBeGreaterThan(2000);
   });
 
   it("매니페스트는 이름과 아이콘을 담는다", () => {
     const manifest = JSON.parse(manifestJson());
-    expect(manifest.name).toBe("Ludus Digest");
+    expect(manifest.name).toBe("PLAYLOG");
     expect(manifest.icons).toHaveLength(2);
   });
 });

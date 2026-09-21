@@ -1,10 +1,10 @@
 import { env } from "./env.ts";
 
-export const SITE_NAME = "Ludus Digest";
-export const SITE_TAGLINE = "게임 업계 뉴스 다이제스트";
+export const SITE_NAME = "PLAYLOG";
+export const SITE_TAGLINE = "게임 뉴스 & 스토리";
 export const SITE_DESCRIPTION =
-  "게임 업계 뉴스와 해외 매체·커뮤니티 반응을 매일 한국어로 요약해 전하는 게임 뉴스 다이제스트. 원문 출처와 태그로 관심 주제만 골라 읽습니다.";
-export const SITE_ALTERNATE_NAME = "루두스 다이제스트";
+  "게임 업계 뉴스와 해외 매체·커뮤니티 반응을 매일 한국어로 요약해 전하는 게임 뉴스 & 스토리. 원문 출처와 태그로 관심 주제만 골라 읽습니다.";
+export const SITE_ALTERNATE_NAME = "플레이로그";
 export const DEFAULT_OG_PATH = "/og/default.png";
 
 /** 검색 결과 등 색인하면 안 되는 페이지의 robots 값. */

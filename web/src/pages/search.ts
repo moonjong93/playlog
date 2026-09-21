@@ -1,5 +1,5 @@
 import { html, raw } from "hono/html";
-import { NOINDEX } from "../site.ts";
+import { NOINDEX, SITE_NAME } from "../site.ts";
 import {
   formatRelativeTime,
   formatTime,
@@ -168,8 +168,8 @@ export function searchPage(options: {
   const query = params.toString();
 
   return layout({
-    title: options.q ? `${options.q} 검색 · Ludus Digest` : "검색 · Ludus Digest",
-    description: "Ludus Digest 기사 검색. 제목·요약·본문에서 키워드로 게임 업계 뉴스를 찾습니다.",
+    title: options.q ? `${options.q} 검색 · ${SITE_NAME}` : `검색 · ${SITE_NAME}`,
+    description: `${SITE_NAME} 기사 검색. 제목·요약·본문에서 키워드로 게임 업계 뉴스를 찾습니다.`,
     current: "search",
     activeTag: options.tag,
     q: options.q,

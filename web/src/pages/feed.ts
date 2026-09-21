@@ -114,9 +114,9 @@ export function feedPage(options: {
   </div>`;
 
   const title = options.tag
-    ? `#${options.tag} · Ludus Digest`
+    ? `#${options.tag} · ${SITE_NAME}`
     : options.page > 1
-    ? `전체 기사 ${options.page}페이지 · Ludus Digest`
+    ? `전체 기사 ${options.page}페이지 · ${SITE_NAME}`
     : `${SITE_NAME} · ${SITE_TAGLINE}`;
   const heading = options.tag ? `태그 #${options.tag}` : SITE_TAGLINE;
   const description = options.tag
@@ -126,7 +126,7 @@ export function feedPage(options: {
   const last = first + Math.max(options.articles.length - 1, 0);
   const listLabel = options.tag
     ? `#${options.tag} 태그 기사`
-    : "Ludus Digest 최신 기사";
+    : `${SITE_NAME} 최신 기사`;
   const jsonLd =
     options.articles.length === 0 || !options.origin
       ? []

@@ -63,11 +63,11 @@ describe("댓글", () => {
     const res = await postComment({
       slug: SLUG,
       body: "닉네임 댓글",
-      nickname: "루두스",
+      nickname: "플레이로그",
       cookie,
     });
     expect(res.status).toBe(201);
-    expect(await res.text()).toContain("루두스");
+    expect(await res.text()).toContain("플레이로그");
   });
 
   it("내용 길이 검증은 422 + 에러 HTML", async () => {

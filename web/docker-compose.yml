@@ -29,7 +29,7 @@ services:
       HOST: "0.0.0.0"
       WEB_DB: /app/data/web.db
       TRUST_PROXY: cloudflare
-      # 비우면 요청 Host(터널 도메인)를 절대 URL 기준으로 쓴다.
-      SITE_URL: ${SITE_URL:-}
+      # 비우면 기본값 news.nevra.app 을 쓴다(.env 에서 다른 도메인으로 덮어쓸 수 있다).
+      SITE_URL: ${SITE_URL:-https://news.nevra.app}
       COOKIE_SECURE: "1"
       RATE_LIMIT_DISABLED: "0"

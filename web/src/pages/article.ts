@@ -1,5 +1,6 @@
 import { html, raw } from "hono/html";
 import { newsArticleJsonLd } from "../seo.ts";
+import { SITE_NAME } from "../site.ts";
 import {
   articleSources,
   formatRelativeTime,
@@ -154,7 +155,7 @@ export function articlePage(options: {
   const description = ledeFirstLine(article.lede_ko) || article.title_ko;
   const ogImage = `/og/s/${encodeURIComponent(article.slug)}.png`;
   return layout({
-    title: `${article.title_ko} · Ludus Digest`,
+    title: `${article.title_ko} · ${SITE_NAME}`,
     description,
     canonical: path,
     origin: options.origin,

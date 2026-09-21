@@ -1,4 +1,5 @@
 import { html } from "hono/html";
+import { SITE_NAME } from "../site.ts";
 import { layout } from "./layout.ts";
 
 function box(message: string) {
@@ -12,7 +13,7 @@ function box(message: string) {
 /** 전체 페이지 안내(404/400/403/429 등). */
 export function messagePage(title: string, message: string) {
   return layout({
-    title: `${title} · Ludus Digest`,
+    title: `${title} · ${SITE_NAME}`,
     current: "none",
     body: box(message),
   });
@@ -20,7 +21,7 @@ export function messagePage(title: string, message: string) {
 
 export function notFoundPage() {
   return layout({
-    title: "없는 기사 · Ludus Digest",
+    title: `없는 기사 · ${SITE_NAME}`,
     current: "none",
     body: box("기사를 찾을 수 없습니다."),
   });
@@ -28,7 +29,7 @@ export function notFoundPage() {
 
 export function pageNotFoundPage() {
   return layout({
-    title: "없는 페이지 · Ludus Digest",
+    title: `없는 페이지 · ${SITE_NAME}`,
     current: "none",
     body: box("페이지를 찾을 수 없습니다."),
   });

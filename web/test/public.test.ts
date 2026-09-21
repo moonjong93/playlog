@@ -132,10 +132,32 @@ describe("공개 읽기", () => {
     expect(text).toContain("Sitemap: http://localhost/sitemap-news.xml");
   });
 
+  it("head·RSS·뉴스 사이트맵·JSON-LD가 PLAYLOG 브랜드를 쓴다", async () => {
+    insertArticle({
+      slug: "brand-fresh",
+      title: "브랜드 확인용 기사",
+      publishedAt: new Date().toISOString(),
+    });
+
+    const home = await (await app.request("/")).text();
+    expect(home).toContain("<title>PLAYLOG ·");
+    expect(home).toContain('property="og:site_name" content="PLAYLOG"');
+    expect(home).toContain('"name":"PLAYLOG"');
+    expect(home).toContain('clip-path="url(#mark)"'); // 헤더에 인라인 로고
+
+    const rss = await (await app.request("/rss.xml")).text();
+    expect(rss).toContain("<title>PLAYLOG ·");
+    expect(rss).toContain("게임 뉴스 &amp; 스토리");
+
+    const news = await (await app.request("/sitemap-news.xml")).text();
+    expect(news).toContain("<news:name>PLAYLOG</news:name>");
+  });
+
   it("favicon·앱 아이콘·매니페스트를 서빙한다", async () => {
     const svg = await app.request("/assets/favicon.svg");
     expect(svg.status).toBe(200);
     expect(svg.headers.get("content-type")).toContain("image/svg+xml");
+    expect(await svg.text()).toContain("M212.688");
 
     const icon = await app.request("/assets/icon-192.png");
     expect(icon.status).toBe(200);
@@ -145,7 +167,7 @@ describe("공개 읽기", () => {
 
     const manifest = await app.request("/site.webmanifest");
     expect(manifest.status).toBe(200);
-    expect(await manifest.text()).toContain('"name": "Ludus Digest"');
+    expect(await manifest.text()).toContain('"name": "PLAYLOG"');
   });
 
   it("기사 OG 카드는 PNG로 나오고 없는 슬러그는 404", async () => {

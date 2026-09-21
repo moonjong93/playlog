@@ -4,7 +4,9 @@ import { gunzipSync } from "node:zlib";
 import { Resvg } from "@resvg/resvg-js";
 import satori from "satori";
 import { env, rootDir } from "./env.ts";
+import { logoPng } from "./brand.ts";
 import { toSearchText } from "./sanitize.ts";
+import { SITE_NAME, SITE_TAGLINE } from "./site.ts";
 import { articleSources, displaySourceName, summaryLines } from "./pages/layout.ts";
 
 export const OG_WIDTH = 1200;
@@ -27,10 +29,35 @@ const C = {
 } as const;
 
 type Style = Record<string, string | number>;
-type Node = { type: string; props: { style: Style; children?: unknown } };
+type Node = {
+  type: string;
+  props: {
+    style: Style;
+    children?: unknown;
+    src?: string;
+    width?: number;
+    height?: number;
+  };
+};
 
 function el(type: string, style: Style, children?: unknown): Node {
   return { type, props: { style, children } };
+}
+
+let logoDataUri: string | undefined;
+
+/** satori 는 SVG 각도 그라디언트를 못 그려서 로고를 PNG 데이터 URI 로 넣는다. */
+function logoImage(size: number): Node {
+  logoDataUri ??= `data:image/png;base64,${Buffer.from(logoPng(size * 2)).toString("base64")}`;
+  return {
+    type: "img",
+    props: {
+      style: { width: size, height: size },
+      src: logoDataUri,
+      width: size,
+      height: size,
+    },
+  };
 }
 
 type Font = {
@@ -100,30 +127,13 @@ export function hostLabel(): string {
       // 아래 기본값으로.
     }
   }
-  return "LUDUS DIGEST";
+  return SITE_NAME;
 }
 
 function header(card: OgCard): Node {
   return el("div", { display: "flex", alignItems: "center", justifyContent: "space-between" }, [
     el("div", { display: "flex", alignItems: "center", gap: 18 }, [
-      el(
-        "div",
-        {
-          width: 52,
-          height: 52,
-          borderRadius: 6,
-          backgroundColor: C.panel,
-          border: `1px solid ${C.outlineVariant}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: C.primary,
-          fontFamily: MONO,
-          fontWeight: 700,
-          fontSize: 24,
-        },
-        ">_",
-      ),
+      logoImage(56),
       el("div", { display: "flex", flexDirection: "column", gap: 6 }, [
         el(
           "div",
@@ -134,7 +144,7 @@ function header(card: OgCard): Node {
             letterSpacing: "-0.02em",
             lineHeight: 1,
           },
-          "Ludus Digest",
+          SITE_NAME,
         ),
         el(
           "div",
@@ -145,7 +155,7 @@ function header(card: OgCard): Node {
             letterSpacing: "0.18em",
             lineHeight: 1,
           },
-          "루두스 다이제스트",
+          SITE_TAGLINE,
         ),
       ]),
     ]),
@@ -424,7 +434,7 @@ export function articleOgCard(article: {
     bullets: ogBullets(article.lede_ko, toSearchText(article.body_html)),
     tags: article.tags ?? [],
     meta: kstDate(article.published_at),
-    kicker: "GAME INDUSTRY DIGEST",
+    kicker: "GAME NEWS & STORIES",
     credit: creditLabel(article.sources_json),
   };
 }
@@ -433,14 +443,14 @@ export const DEFAULT_OG_KEY = "site-default";
 
 export function defaultOgCard(): OgCard {
   return {
-    title: "게임 업계 뉴스 다이제스트",
+    title: "게임 업계 뉴스 & 스토리",
     bullets: [
       "해외 매체와 커뮤니티 반응을 한 번에",
       "3줄 핵심 요약과 원문 출처",
       "태그로 관심 주제만 골라 읽기",
     ],
     tags: [],
-    meta: "루두스 다이제스트",
-    kicker: "GAME INDUSTRY DIGEST",
+    meta: SITE_NAME,
+    kicker: "GAME NEWS & STORIES",
   };
 }

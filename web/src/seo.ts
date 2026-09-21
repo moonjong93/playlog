@@ -1,7 +1,7 @@
 import {
   SITE_ALTERNATE_NAME,
+  SITE_DESCRIPTION,
   SITE_NAME,
-  SITE_TAGLINE,
   absoluteUrl,
 } from "./site.ts";
 
@@ -12,7 +12,7 @@ export function organizationJsonLd(origin: string) {
     name: SITE_NAME,
     alternateName: SITE_ALTERNATE_NAME,
     url: absoluteUrl("/", origin),
-    description: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
     logo: {
       "@type": "ImageObject",
       url: absoluteUrl("/assets/icon-512.png", origin),
