@@ -1,0 +1,13 @@
+# 터널 자격증명·실제 config
+cloudflared/*.json
+cloudflared/config.yml
+
+# 서비스별 실제 env (예시만 커밋)
+env/*.env
+!env/*.env.example
+
+# 컨테이너 볼륨(SQLite)
+compose/data/
+
+# 빌드 산출물(이미지 tar.gz)
+dist/

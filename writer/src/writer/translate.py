@@ -12,7 +12,7 @@ from .llm import LLMResult, OpenRouterChat
 log = logging.getLogger(__name__)
 
 TRANSLATE_TEMPERATURE = 0.2
-TRANSLATE_MAX_TOKENS = 4000
+TRANSLATE_MAX_TOKENS = 16000
 
 SYSTEM = """
 당신은 해외 게임 커뮤니티 댓글을 한국어로 옮기는 번역기다. 요약하거나 설명하지 않는다.

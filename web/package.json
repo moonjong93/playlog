@@ -34,5 +34,10 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^5.0.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true,
+    "@parcel/watcher@2.5.1": true
   }
 }

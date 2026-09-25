@@ -2,3 +2,5 @@
 node_modules/
 .venv/
 __pycache__/
+# 실수로 커밋하면 안 되는 스크래치(실키 사본). 삭제 권장.
+Untitled

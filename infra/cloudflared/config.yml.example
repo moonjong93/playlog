@@ -1,0 +1,16 @@
+# Cloudflare Tunnel ingress (로컬 관리형).
+#   cp config.yml.example config.yml 후 터널 ID/도메인을 채운다.
+#   같은 디렉터리에 <TUNNEL-ID>.json (cloudflared tunnel create 결과) 을 둔다.
+#
+# 서비스 추가 = hostname/service 한 줄 추가 + `cloudflared tunnel route dns` 1회.
+tunnel: playlog
+credentials-file: /etc/cloudflared/REPLACE-WITH-TUNNEL-ID.json
+
+ingress:
+  - hostname: news.nevra.app
+    service: http://news-web:8787
+    originRequest:
+      connectTimeout: 10s
+  # - hostname: <service2 도메인>
+  #   service: http://service2:8788
+  - service: http_status:404     # 마지막 규칙은 반드시 있어야 한다
