@@ -5,8 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Develop/news/writer
-ExecStart=%h/Develop/news/writer/.venv/bin/writer run --interval 10800
+# 리포를 ~/playlog 에 클론했다고 가정한다. 경로가 다르면 수정할 것.
+WorkingDirectory=%h/playlog/writer
+ExecStart=%h/playlog/writer/.venv/bin/writer run --interval 10800
 Restart=always
 RestartSec=30
 Nice=10

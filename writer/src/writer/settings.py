@@ -82,7 +82,8 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    load_dotenv()
+    load_dotenv()                                 # writer/.env
+    load_dotenv(PROJECT_ROOT.parent / ".env")      # 루트 .env (없으면 무시, 프로젝트 .env 우선)
     root = PROJECT_ROOT
     default_db = root.parent / "collector" / "data" / "news.db"
     api_key = _str("OPENROUTER_API_KEY") or _str("WRITER_API_KEY")

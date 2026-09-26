@@ -1,0 +1,58 @@
+# news 공개 서비스 (app LXC) — 루트에서 실행한다.
+#
+#   cp .env.example .env && vi .env
+#   docker compose up -d --build
+#
+# - 호스트 포트는 loopback(127.0.0.1:${WEB_PORT})만 연다. 외부 유입은 cloudflared 터널뿐.
+# - cloudflared ingress 는 Cloudflare 대시보드에서 등록한다:
+#     news.nevra.app → http://news-web:8787
+# - collector/writer 는 여기서 뜨지 않는다. 네이티브(systemd --user)로 돌린다:
+#     collector/systemd/collector-run.service, writer/systemd/writer-run.service
+# - SQLite 는 ./data/<서비스>/ 에 있다. 백업은 WAL 때문에 파일 복사 대신:
+#     sqlite3 data/news-web/web.db ".backup '/tmp/web-$(date +%F).db'"
+name: news
+
+networks:
+  edge:
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?루트 .env 에 CLOUDFLARE_TUNNEL_TOKEN 를 설정하세요}
+    networks: [edge]
+    depends_on: [news-web]
+
+  news-web:
+    build: ./web
+    image: news-web:local
+    container_name: news-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8787}:8787"
+    volumes:
+      - ./data/news-web:/app/data
+    environment:
+      WEB_API_KEY: ${WEB_API_KEY:?루트 .env 에 WEB_API_KEY 를 설정하세요}
+      SESSION_SECRET: ${SESSION_SECRET:?루트 .env 에 SESSION_SECRET 을 설정하세요}
+      PORT: "8787"
+      HOST: "0.0.0.0"
+      WEB_DB: /app/data/web.db
+      TRUST_PROXY: cloudflare
+      SITE_URL: ${SITE_URL:-https://news.nevra.app}
+      COOKIE_SECURE: "1"
+      RATE_LIMIT_DISABLED: "0"
+    networks: [edge]
+
+  # 두 번째 공개 서비스 템플릿. 이미지가 준비되면 주석을 풀고
+  # cloudflared 대시보드에 <도메인> → http://service2:<포트> 를 추가한다.
+  # service2:
+  #   image: service2:local
+  #   container_name: service2
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./data/service2:/app/data
+  #   networks: [edge]

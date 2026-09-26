@@ -101,29 +101,22 @@ done
 
 ## 배포 (개인 서버 + Cloudflare Tunnel)
 
+루트 `docker-compose.yml` 로 배포한다(web 단독 compose 는 없다).
+
 ```bash
-cd web
-cp .env.example .env      # SESSION_SECRET 은 `openssl rand -hex 32` 로 채운다
+cd <repo root>
+cp .env.example .env      # WEB_API_KEY, SESSION_SECRET(openssl rand -hex 32), CLOUDFLARE_TUNNEL_TOKEN
 docker compose up -d --build
 ```
 
-compose 는 `web/.env` 를 자동으로 읽어 `${WEB_API_KEY}`, `${SESSION_SECRET}` 를 채운다. 두 값이 비어 있으면 기동 전에 에러로 멈춘다.
-
-- `.env` 에서 읽는 건 `WEB_API_KEY`, `SESSION_SECRET`, `SITE_URL` 뿐이다. 나머지는 컨테이너 값으로 고정된다: `PORT=8787`, `HOST=0.0.0.0`, `WEB_DB=/app/data/web.db`, `TRUST_PROXY=cloudflare`, `COOKIE_SECURE=1`, `RATE_LIMIT_DISABLED=0`. 로컬 개발용 설정이 컨테이너에 섞여 들어가지 않는다. `SITE_URL` 을 비워 두면 기본값 `https://news.nevra.app` 을 canonical·OG·sitemap 기준으로 쓴다(다른 도메인이면 `.env` 에서 덮어쓴다).
-- 포트는 호스트 루프백 `127.0.0.1:8787` 에만 열린다.
-- `./data` 가 `/app/data` 볼륨이다. 컨테이너는 비루트(uid 1000)로 돌아서, 리눅스 호스트에서는 미리 `mkdir -p data` 로 만들어 두는 게 안전하다(없으면 도커가 root 소유로 만든다). root 소유로 생겼다면 `sudo chown -R 1000:1000 data`.
-- `TRUST_PROXY=cloudflare` 라서 방문자 IP 를 `CF-Connecting-IP` 로 잡는다. 터널을 안 거치면 이 헤더는 위조 가능하니 반드시 Tunnel 뒤에서만 켠다. 안 켜면 모든 요청의 IP 가 터널/로컬 IP 로 보여 레이트 리밋이 전체에 걸린다.
-- `COOKIE_SECURE=1` 이므로 HTTPS(터널 도메인)로 접속해야 세션 쿠키가 유지된다. `http://127.0.0.1:8787` 로 직접 볼 때는 쿠키가 안 붙는다.
-- 이미지 빌드에서 `npm run css` 가 돌아 `dist/app.css` 가 이미지 안에 들어간다. `npm start` 의 prestart 가 시작할 때 한 번 더 CSS 를 빌드한다.
-
-터널:
-
-```bash
-cloudflared tunnel --url http://127.0.0.1:8787
-```
+- 컨테이너는 `WEB_API_KEY`, `SESSION_SECRET`, `SITE_URL` 만 받는다. 나머지는 컨테이너 값으로 고정된다: `PORT=8787`, `HOST=0.0.0.0`, `WEB_DB=/app/data/web.db`, `TRUST_PROXY=cloudflare`, `COOKIE_SECURE=1`, `RATE_LIMIT_DISABLED=0`. 로컬 개발용 설정이 컨테이너에 섞여 들어가지 않는다.
+- 포트는 호스트 루프백 `127.0.0.1:${WEB_PORT}` (기본 8787)에만 열린다. 외부 유입은 cloudflared 터널뿐이고 ingress 는 Cloudflare 대시보드에서 `news.nevra.app → http://news-web:8787` 로 등록한다.
+- `./data/news-web` 이 `/app/data` 볼륨이다. 컨테이너는 비루트(uid 1000)로 돌아서 리눅스에서는 미리 `mkdir -p data/news-web && chown 1000:1000 data/news-web` 한다.
+- `TRUST_PROXY=cloudflare` 라서 방문자 IP 를 `CF-Connecting-IP` 로 잡는다. 터널 뒤에서만 유효하다. `COOKIE_SECURE=1` 이므로 댓글 세션은 HTTPS(터널 도메인)에서만 유지된다.
+- 이미지 빌드에서 `npm run css` 가 돌아 `dist/app.css` 가 이미지 안에 들어간다.
 
 ## 운영 메모
 
-- SQLite 는 WAL 모드다. 백업은 `data/` 를 통째로 해야 한다 — `docker compose stop web && cp -a data data.bak` 처럼 컨테이너를 멈추고 복사하면 `web.db`, `-wal`, `-shm` 이 한 세트로 남는다. DB 사본은 이 볼륨이 유일하다.
+- SQLite 는 WAL 모드다. 백업은 파일 복사 대신 `sqlite3 data/news-web/web.db ".backup '/tmp/web-$(date +%F).db'"` 로 뜬다. DB 사본은 이 볼륨이 유일하다.
 - `WEB_API_KEY` 를 회전하면 writer(`publish.py`)의 `WEB_API_KEY` 도 같이 바꿔야 발행이 계속 된다. 한쪽만 바꾸면 발행이 401 로 떨어진다.
 - `SESSION_SECRET` 을 바꾸면 기존 세션이 전부 무효화된다(로그인이 없어서 영향은 리밋 주체와 댓글 소유권 정도).

@@ -79,7 +79,8 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    load_dotenv()
+    load_dotenv()                                 # collector/.env
+    load_dotenv(PROJECT_ROOT.parent / ".env")      # 루트 .env (없으면 무시, 프로젝트 .env 우선)
     root = PROJECT_ROOT
     # 백엔드별 DB 키(모델 이름)가 다르다. 벡터 공간이 다르므로 섞으면 안 된다.
     provider = _str("EMBED_PROVIDER", "local").lower()

@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 export const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 config({ path: join(rootDir, ".env") });
+// 루트 .env 는 공통값(프로젝트 .env 가 있으면 그쪽이 우선; dotenv 는 기존 값을 덮지 않는다).
+config({ path: join(rootDir, "..", ".env") });
 
 function required(name: string): string {
   const value = process.env[name]?.trim();

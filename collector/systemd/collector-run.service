@@ -5,11 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Develop/news/collector
-ExecStart=%h/Develop/news/collector/.venv/bin/collector run --interval 900
+# 리포를 ~/playlog 에 클론했다고 가정한다. 경로가 다르면 수정할 것.
+WorkingDirectory=%h/playlog/collector
+ExecStart=%h/playlog/collector/.venv/bin/collector run --interval 900
 Restart=always
 RestartSec=30
-# N100 같은 저전력 장비에서 수집기가 우선순위를 양보하도록
+# 저전력 장비에서 수집기가 우선순위를 양보하도록
 Nice=5
 StandardOutput=journal
 StandardError=journal
