@@ -22,6 +22,34 @@ cd writer    && uv sync && uv run writer run --once       # 묶기→기사→�
 cd web       && npm ci && npm start                        # http://127.0.0.1:8787
 ```
 
+## 개발 → 배포 흐름
+
+| 단계 | 어디서 | 하는 일 |
+|---|---|---|
+| 1. 개발/테스트 | dev LXC | collector/writer/web 을 로컬 실행(`uv run`, `npm start`). 프로젝트 `.env` 사용 |
+| 2. 커밋/푸시 | dev | `git push` — 루트 `.env`·프로젝트 `.env` 는 gitignore 라 안 올라간다 |
+| 3. 배포 | app LXC | `cd ~/playlog && ./deploy.sh` |
+
+`deploy.sh`: `git pull` → `docker compose up -d --build news-web` → collector/writer `uv sync` → systemd 유닛 재시작 → 상태 출력.
+
+부분 배포:
+
+| 바뀐 것 | 명령 (app에서) |
+|---|---|
+| web 코드 | `docker compose up -d --build news-web` |
+| collector/writer 코드 | `(cd collector && uv sync)` · `(cd writer && uv sync)` 후 `systemctl --user restart collector-run writer-run` |
+| 시크릿·포트·도메인 | 루트 `.env` 수정 → `docker compose up -d` (컨테이너 재생성) + 서비스 재시작 |
+| 롤백 | `git checkout <이전 커밋> && ./deploy.sh` |
+
+상태/로그:
+
+```bash
+docker compose ps
+docker compose logs -f cloudflared
+journalctl --user -u collector-run -f
+journalctl --user -u writer-run -f
+```
+
 ## 배포 (app LXC)
 
 ```bash
