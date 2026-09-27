@@ -170,6 +170,22 @@ describe("공개 읽기", () => {
     expect(await manifest.text()).toContain('"name": "PLAYLOG"');
   });
 
+  it("검색엔진 소유확인 HTML을 루트에서 서빙한다", async () => {
+    const google = await app.request("/google48e09fda079b423e.html");
+    expect(google.status).toBe(200);
+    expect(google.headers.get("content-type")).toContain("text/html");
+    expect(await google.text()).toContain(
+      "google-site-verification: google48e09fda079b423e.html",
+    );
+
+    const naver = await app.request("/naver7a9befcb2efa0c16421b44b3e5af157c.html");
+    expect(naver.status).toBe(200);
+    expect(naver.headers.get("content-type")).toContain("text/html");
+    expect(await naver.text()).toContain(
+      "naver-site-verification: naver7a9befcb2efa0c16421b44b3e5af157c.html",
+    );
+  });
+
   it("기사 OG 카드는 PNG로 나오고 없는 슬러그는 404", async () => {
     const res = await app.request("/og/s/tgs-2026-report.png");
     expect(res.status).toBe(200);

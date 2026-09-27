@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -75,6 +75,24 @@ function originOf(c: Context): string {
   return env.siteUrl || new URL(c.req.url).origin;
 }
 
+/**
+ * 검색엔진 소유확인용 HTML(`assets/searches/*.html`). 파일명 그대로 사이트
+ * 루트에 서빙해야 구글·네이버가 확인할 수 있다. 기동 시 한 번 읽는다.
+ */
+const searchVerificationFiles = (() => {
+  const dir = join(rootDir, "assets", "searches");
+  const files = new Map<string, string>();
+  try {
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith(".html")) continue;
+      files.set(name, readFileSync(join(dir, name), "utf8"));
+    }
+  } catch {
+    // 디렉터리가 없으면 확인 파일 없이 동작한다.
+  }
+  return files;
+})();
+
 /** 레이트 리밋을 적용하지 않는 정적·크롤러용 경로. */
 function isCacheableAsset(path: string): boolean {
   return (
@@ -84,7 +102,8 @@ function isCacheableAsset(path: string): boolean {
     path === "/robots.txt" ||
     path === "/site.webmanifest" ||
     path === "/sitemap.xml" ||
-    path === "/sitemap-news.xml"
+    path === "/sitemap-news.xml" ||
+    searchVerificationFiles.has(path.slice(1))
   );
 }
 
@@ -600,6 +619,14 @@ app.get("/site.webmanifest", (c) => {
     "Content-Type": "application/manifest+json; charset=utf-8",
   });
 });
+
+// 검색엔진 소유확인 파일(구글·네이버). 루트 경로에서 파일 내용 그대로 내보낸다.
+for (const [name, body] of searchVerificationFiles) {
+  app.get(`/${name}`, (c) => {
+    c.header("Cache-Control", "public, max-age=3600");
+    return c.body(body, 200, { "Content-Type": "text/html; charset=utf-8" });
+  });
+}
 
 /** 기사 OG 카드. `/og/s/:slug.png` 와 사이트 기본 카드 `/og/default.png`. */
 app.get("/og/*", async (c) => {

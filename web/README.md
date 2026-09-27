@@ -78,6 +78,7 @@ curl -sS -X POST http://127.0.0.1:8787/internal/articles \
 | `/sitemap.xml` | 홈·태그 목록·태그 피드·기사 전체 + 기사 OG 이미지(`image:image`) |
 | `/sitemap-news.xml` | 최근 48시간 기사(Google 뉴스 사이트맵) |
 | `/robots.txt` | 검색·미리보기 봇 허용, AI 학습 수집기·저가치 SEO 크롤러 차단, sitemap 안내 |
+| `/google*.html`, `/naver*.html` | 검색엔진 소유확인 파일. `assets/searches/*.html` 을 사이트 루트 경로로 그대로 서빙한다 |
 
 - 카드 생성은 `satori`(HTML→SVG) + `@resvg/resvg-js`(SVG→PNG)로 한다. 슬러그+수정시각을 키로 메모리에 캐시(최대 200장)하고, 같은 URL 동시 요청은 한 번만 렌더한다. 응답은 `Cache-Control: public, max-age=86400`.
 - 폰트는 `assets/fonts/*.ttf.gz`(Gzip)에 둔 서브셋이다. Noto Sans KR(OFL)에서 한글 음절·가나·기호 + 라틴, JetBrains Mono(OFL)에서 라틴을 남겼다. 라이선스 원문은 같은 디렉터리의 `OFL-*.txt`. 폰트를 바꿀 때는 두 파일을 같은 이름으로 교체하면 된다.
@@ -98,7 +99,7 @@ done
 - 구조화 데이터(JSON-LD): 모든 페이지에 `WebSite` + `Organization`, 기사에 `NewsArticle`(제목·요약·이미지·발행/수정 시각·태그·댓글 수), 피드에 `ItemList`. 전부 `<`를 이스케이프해 `</script>`로 끊기지 않게 한다.
 - 검색 페이지는 `noindex, follow`, 나머지는 `max-image-preview:large, max-snippet:-1`(+ canonical, og/twitter 카드, `rel=prev/next`). 기사 하단의 "관련 기사"는 같은 태그를 많이 공유하는 순으로 붙는다(내부 링크).
 - `og:image`·canonical·sitemap 은 `SITE_URL` 이 있으면 그 값, 없으면 요청의 origin 을 쓴다. compose 는 기본값이 `https://news.nevra.app` 이고 `.env` 로 덮어쓸 수 있다.
-- 검색엔진 등록 순서: 도메인 확정 → `SITE_URL` 채우기 → 서치콘솔 소유확인 값(`GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` / `BING_SITE_VERIFICATION`)을 넣고 재기동 → 각 콘솔에 `https://<도메인>/sitemap.xml`, `/sitemap-news.xml` 제출. `robots.txt` 는 크롤러가 자동으로 읽는다.
+- 검색엔진 등록 순서: 도메인 확정 → `SITE_URL` 채우기 → 소유확인 후 → 각 콘솔에 `https://<도메인>/sitemap.xml`, `/sitemap-news.xml` 제출. `robots.txt` 는 크롤러가 자동으로 읽는다. 소유확인은 메타태그 환경변수(`GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` / `BING_SITE_VERIFICATION`)와 HTML 파일(`assets/searches/*.html`) 두 방식 모두 된다.
 
 ## 배포 (개인 서버 + Cloudflare Tunnel)
 
