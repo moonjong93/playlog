@@ -42,6 +42,12 @@ import {
   notFoundPage,
   pageNotFoundPage,
 } from "./pages/misc.ts";
+import {
+  aboutPage,
+  contactPage,
+  privacyPage,
+  termsPage,
+} from "./pages/legal.ts";
 import { type ArticleRow } from "./pages/layout.ts";
 import { logoPng, logoSvg, manifestJson } from "./brand.ts";
 import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
@@ -305,6 +311,12 @@ app.get("/tags", (c) => {
   );
 });
 
+/** 푸터 안내·법적 문서. 읽기 전용 정적 페이지라 DB를 쓰지 않는다. */
+app.get("/about", (c) => c.html(aboutPage({ origin: originOf(c) })));
+app.get("/privacy", (c) => c.html(privacyPage({ origin: originOf(c) })));
+app.get("/terms", (c) => c.html(termsPage({ origin: originOf(c) })));
+app.get("/contact", (c) => c.html(contactPage({ origin: originOf(c) })));
+
 app.get("/search", (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, QUERY_MAX);
   const tag = (c.req.query("tag") ?? "").trim();
@@ -422,6 +434,9 @@ app.get("/sitemap.xml", (c) => {
       homeLast ? `<lastmod>${xmlEscape(homeLast)}</lastmod>` : ""
     }</url>`,
   );
+  for (const path of ["/about", "/privacy", "/terms", "/contact"]) {
+    entries.push(`  <url><loc>${xmlEscape(`${origin}${path}`)}</loc></url>`);
+  }
   for (const row of tags) {
     entries.push(
       `  <url><loc>${xmlEscape(`${origin}/?tag=${encodeURIComponent(row.tag)}`)}</loc>` +

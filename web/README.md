@@ -5,6 +5,7 @@ PLAYLOG(`news.nevra.app`) 웹. 게임 업계 뉴스 & 스토리. Hono + SQLite(b
 - 읽기는 전부 공개다. `/`, `/s/:slug`, `/search`, `/rss.xml` 은 키 없이 열린다.
 - 발행(`/internal/*`)만 키가 필요하다. writer 가 `POST /internal/articles` 를 Bearer `WEB_API_KEY` 로 호출한다.
 - 예전의 `?key=` 쿼리 인증은 제거됐다.
+- 푸터 안내 페이지: `/about`(소개), `/privacy`(개인정보 처리방침), `/terms`(이용약관), `/contact`(문의). 문의 주소는 `support.news@nevra.app` 이고 네 페이지 모두 `sitemap.xml` 에 포함된다.
 
 ## 로컬 실행
 

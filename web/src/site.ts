@@ -7,6 +7,12 @@ export const SITE_DESCRIPTION =
 export const SITE_ALTERNATE_NAME = "플레이로그";
 export const DEFAULT_OG_PATH = "/og/default.png";
 
+/** 문의·법적 요청 수신 주소. 푸터와 안내 페이지가 함께 쓴다. */
+export const SITE_CONTACT_EMAIL = "support.news@nevra.app";
+
+/** 안내·법적 문서의 시행일 표기. */
+export const LEGAL_EFFECTIVE_DATE = "2026년 9월 26일";
+
 /** 검색 결과 등 색인하면 안 되는 페이지의 robots 값. */
 export const NOINDEX = "noindex, follow";
 

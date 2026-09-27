@@ -8,6 +8,7 @@ import { organizationJsonLd, websiteJsonLd } from "../seo.ts";
 import {
   DEFAULT_OG_PATH,
   ROBOTS_DEFAULT,
+  SITE_CONTACT_EMAIL,
   SITE_NAME,
   SITE_TAGLINE,
   absoluteUrl,
@@ -311,20 +312,34 @@ function siteHeader(options: {
 }
 
 function siteFooter() {
+  const linkCls =
+    "text-body-sm font-body-sm text-on-surface-variant hover:text-on-surface transition-colors";
   return html`<footer
     class="bg-surface-container-lowest border-t border-outline-variant mt-12"
   >
-    <div
-      class="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-4"
-    >
+    <div class="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-5">
       <div class="flex flex-col md:flex-row items-center gap-4">
         <span class="text-label-mono-md font-label-mono-md font-bold text-on-surface"
           >${SITE_NAME}</span
         >
         <span class="text-body-sm font-body-sm text-outline text-center md:text-left">
-          게임 업계 뉴스와 해외 반응을 매일 한국어로 정리합니다. Powered by AI Summaries.
+          게임 업계 뉴스와 해외 반응을 매일 한국어로 정리합니다.
         </span>
       </div>
+      <nav
+        class="flex flex-wrap items-center justify-center md:justify-start gap-x-5 gap-y-2"
+        aria-label="사이트 안내"
+      >
+        <a class="${linkCls}" href="/about">소개</a>
+        <a class="${linkCls}" href="/privacy">개인정보 처리방침</a>
+        <a class="${linkCls}" href="/terms">이용약관</a>
+        <a class="${linkCls}" href="mailto:${SITE_CONTACT_EMAIL}"
+          >문의 · ${SITE_CONTACT_EMAIL}</a
+        >
+      </nav>
+      <p class="text-label-mono-sm font-label-mono-sm text-outline">
+        © ${new Date().getFullYear()} ${SITE_NAME}
+      </p>
     </div>
   </footer>`;
 }
