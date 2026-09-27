@@ -39,3 +39,4 @@
 2026-09-26 11:08:17 | ISSUE=web | 소개 문구 수정: AI·자동 표현 제거하고 공개된 이야기 기반 게임 흐름 중심으로 재작성(수집→정리→흐름), 소개·문의는 시행일 표기 제거(방침·약관만 유지), 푸터 Powered by AI Summaries 제거, legal 테스트 보강(113 통과·tsc), 8787 재기동 확인
 2026-09-26 11:21:01 | ISSUE=web | 약관 문구 다듬기: 서비스 소개를 공개된 소식을 한국어로 정리하는 무료 뉴스로, 콘텐츠 한계 고지를 정리된 내용은 원문 기반 요약이라는 표현으로(인공지능 표현 전부 제거). 테스트 113·tsc 통과, 8787 재기동 확인
 2026-09-27 10:46:28 | ISSUE=infra | 배포: f1e53b3 푸시 → app LXC deploy.sh(news-web 재빌드·collector/writer uv sync·systemd 재시작). 공개 스모크 news.nevra.app / /about /privacy /terms /contact 200, 푸터 ©2026·문의 링크 확인. 참고: Cloudflare 이메일 난독화가 mailto를 /cdn-cgi/l/email-protection으로 감쌈(브라우저에서는 정상, 끄려면 Scrape Shield 설정)
+2026-09-27 23:54:46 | ISSUE=web | 검색엔진 소유확인: assets/searches/*.html(구글·네이버)을 루트 경로로 서빙(기동 시 읽어 캐시, 레이트리밋·세션 예외), public 테스트 1케이스(전체 114)·tsc 통과. 6f19dfa 푸시 → app deploy.sh 재배포, 공개 /google48e09fda079b423e.html·/naver7a9befcb2efa0c16421b44b3e5af157c.html 200·원문 확인
