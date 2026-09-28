@@ -42,3 +42,4 @@
 2026-09-27 23:54:46 | ISSUE=web | 검색엔진 소유확인: assets/searches/*.html(구글·네이버)을 루트 경로로 서빙(기동 시 읽어 캐시, 레이트리밋·세션 예외), public 테스트 1케이스(전체 114)·tsc 통과. 6f19dfa 푸시 → app deploy.sh 재배포, 공개 /google48e09fda079b423e.html·/naver7a9befcb2efa0c16421b44b3e5af157c.html 200·원문 확인
 2026-09-28 07:34:03 | ISSUE=web | 특집 배지: "특집" 태그가 있으면 피드 카드·기사 상단에 강조 배지(tertiary) 렌더, 태그 칩에서는 #특집 숨김(헤더 최근 태그에는 노출). FEATURE_TAG 상수 추가, feature.test.ts 4케이스(전체 118)·tsc 통과
 2026-09-28 07:34:03 | ISSUE=writer | 수동 특집 발행: writer feature --file(front matter+마크다운 → POST /internal/articles, ##/###·인용·목록·구분선·굵게/링크 지원, --dry-run). features/pubg-asia-stars-2026-bangple.md 원고 작성·로컬 8787 발행(HTTP 201) 확인. writer 88 테스트 통과
+2026-09-28 07:38:31 | ISSUE=infra | 특집 발행: c67ea97 푸시 → app deploy.sh(news-web 재빌드·systemd 재시작) → writer feature features/pubg-asia-stars-2026-bangple.md 발행(HTTP 201). 공개 확인 news.nevra.app 기사·홈·/tags·RSS·sitemap 200, 특집 배지·h2 8개·출처 7개, OG 카드 200 image/png
