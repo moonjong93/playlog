@@ -40,3 +40,5 @@
 2026-09-26 11:21:01 | ISSUE=web | 약관 문구 다듬기: 서비스 소개를 공개된 소식을 한국어로 정리하는 무료 뉴스로, 콘텐츠 한계 고지를 정리된 내용은 원문 기반 요약이라는 표현으로(인공지능 표현 전부 제거). 테스트 113·tsc 통과, 8787 재기동 확인
 2026-09-27 10:46:28 | ISSUE=infra | 배포: f1e53b3 푸시 → app LXC deploy.sh(news-web 재빌드·collector/writer uv sync·systemd 재시작). 공개 스모크 news.nevra.app / /about /privacy /terms /contact 200, 푸터 ©2026·문의 링크 확인. 참고: Cloudflare 이메일 난독화가 mailto를 /cdn-cgi/l/email-protection으로 감쌈(브라우저에서는 정상, 끄려면 Scrape Shield 설정)
 2026-09-27 23:54:46 | ISSUE=web | 검색엔진 소유확인: assets/searches/*.html(구글·네이버)을 루트 경로로 서빙(기동 시 읽어 캐시, 레이트리밋·세션 예외), public 테스트 1케이스(전체 114)·tsc 통과. 6f19dfa 푸시 → app deploy.sh 재배포, 공개 /google48e09fda079b423e.html·/naver7a9befcb2efa0c16421b44b3e5af157c.html 200·원문 확인
+2026-09-28 07:34:03 | ISSUE=web | 특집 배지: "특집" 태그가 있으면 피드 카드·기사 상단에 강조 배지(tertiary) 렌더, 태그 칩에서는 #특집 숨김(헤더 최근 태그에는 노출). FEATURE_TAG 상수 추가, feature.test.ts 4케이스(전체 118)·tsc 통과
+2026-09-28 07:34:03 | ISSUE=writer | 수동 특집 발행: writer feature --file(front matter+마크다운 → POST /internal/articles, ##/###·인용·목록·구분선·굵게/링크 지원, --dry-run). features/pubg-asia-stars-2026-bangple.md 원고 작성·로컬 8787 발행(HTTP 201) 확인. writer 88 테스트 통과

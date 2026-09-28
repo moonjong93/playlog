@@ -4,6 +4,7 @@
     writer doctor
     writer cluster [--limit N] [--dry-run]
     writer write --story-id N
+    writer feature --file 특집.md
     writer stories [--limit N]
     writer run [--interval 10800] [--once] [--limit N] [--dry-run] [--no-write]
     writer bench                 .env BENCH_MODELS 로 경합 (show|run 생략 가능)
@@ -20,11 +21,13 @@ import os
 import signal
 import sys
 import time
+from pathlib import Path
 
 from . import __version__
-from .db import collector_counts, connect, counts, embed_models, init_db
+from .db import collector_counts, connect, counts, embed_models, init_db, utcnow
 from .llm import OpenRouterChat
 from .bench import latest_run_id, list_runs, parse_models, run_bench, show_run
+from .feature import FeatureError, feature_payload, load_feature, publish_feature
 from .pipeline import build_prepared, format_plan, persist_prepared, run_once, write_story
 from .settings import load_settings
 from .agents import load_prompts, prompt_version
@@ -138,6 +141,39 @@ def cmd_write(args) -> int:
     finally:
         chat.close()
     print(f"발행: {path}")
+    return 0
+
+
+def cmd_feature(args) -> int:
+    """수동 특집 원고(front matter + 마크다운)를 웹에 발행한다."""
+    s = load_settings()
+    try:
+        doc = load_feature(Path(args.file))
+    except FeatureError as exc:
+        print(f"특집 파일 오류: {exc}", file=sys.stderr)
+        return 2
+    now = utcnow()
+    payload = feature_payload(doc, published_at=now, updated_at=now)
+    print(f"제목  : {payload['title_ko']}")
+    print(f"슬러그: {payload['slug']}")
+    print(f"태그  : {', '.join(payload.get('tags') or []) or '(없음)'}")
+    print(f"발행일: {payload['published_at']}")
+    print(f"본문  : HTML {len(payload['body_html'])}자, 출처 {len(payload['sources'])}개")
+    if args.dry_run:
+        print("dry-run — 발행하지 않았다")
+        return 0
+    if not s.web_url:
+        print("WEB_URL 이 비어 있어 발행할 수 없다", file=sys.stderr)
+        return 1
+    try:
+        code = publish_feature(
+            doc, base_url=s.web_url, api_key=s.web_api_key,
+            published_at=now, updated_at=now,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"발행 실패: {exc}", file=sys.stderr)
+        return 1
+    print(f"발행 완료 → HTTP {code}")
     return 0
 
 
@@ -299,6 +335,11 @@ def build_parser() -> argparse.ArgumentParser:
     w = sub.add_parser("write", help="스토리 하나 쓰기")
     w.add_argument("--story-id", type=int, required=True)
     w.set_defaults(func=cmd_write)
+
+    ft = sub.add_parser("feature", help="수동 특집 발행 (front matter + 마크다운)")
+    ft.add_argument("--file", required=True, help="특집 원고 .md 경로")
+    ft.add_argument("--dry-run", action="store_true")
+    ft.set_defaults(func=cmd_feature)
 
     ls = sub.add_parser("stories", help="최근 스토리")
     ls.add_argument("--limit", type=int, default=30)

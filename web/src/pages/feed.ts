@@ -2,6 +2,7 @@ import { html } from "hono/html";
 import { itemListJsonLd } from "../seo.ts";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "../site.ts";
 import {
+  featureBadge,
   formatRelativeTime,
   formatTime,
   layout,
@@ -20,7 +21,7 @@ function feedCard(article: ArticleRow) {
   >
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2 mb-1.5">
-        ${sourceBadges(article.sources_json)}
+        ${featureBadge(article.tags ?? [])} ${sourceBadges(article.sources_json)}
         <time
           class="text-label-mono-sm font-label-mono-sm text-outline"
           datetime="${article.published_at}"

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { html, raw } from "hono/html";
 import { env, rootDir } from "../env.ts";
 import { logoSvg } from "../brand.ts";
+import { FEATURE_TAG } from "../tags.ts";
 import { recentTags } from "../tagStore.ts";
 import { organizationJsonLd, websiteJsonLd } from "../seo.ts";
 import {
@@ -153,9 +154,18 @@ export function sourceBadges(json: string) {
   });
 }
 
-/** 태그 칩 묶음. 각 칩은 피드 태그 필터(/?tag=)로 링크한다. */
+/** '특집' 태그가 있으면 강조 배지를 그린다. 없으면 빈 문자열. */
+export function featureBadge(tags: string[]) {
+  if (!tags.includes(FEATURE_TAG)) return "";
+  return html`<span
+    class="inline-flex items-center px-2 py-0.5 rounded text-label-mono-sm font-label-mono-sm font-bold tracking-wider bg-tertiary/15 text-tertiary border border-tertiary/40"
+    >특집</span
+  >`;
+}
+
+/** 태그 칩 묶음. 각 칩은 피드 태그 필터(/?tag=)로 링크한다. 특집은 배지로 따로 보여준다. */
 export function tagChips(tags: string[]) {
-  const list = tags.filter((tag) => tag.trim() !== "");
+  const list = tags.filter((tag) => tag.trim() !== "" && tag !== FEATURE_TAG);
   if (list.length === 0) return "";
   return html`<div class="flex flex-wrap items-center gap-1.5 mt-2">
     ${list.map(

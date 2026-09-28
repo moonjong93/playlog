@@ -5,6 +5,9 @@ export const MAX_TAGS = 5;
 export const TAG_MAX_LEN = 20;
 export const TAGS_PAGE_SIZE = 30;
 
+/** 이 태그가 붙으면 피드·기사 상단에 '특집' 배지로 보여준다(칩은 숨긴다). */
+export const FEATURE_TAG = "특집";
+
 /** v3 이전 section enum → 한글 태그. */
 export const LEGACY_SECTION_TAGS: Record<string, string> = {
   industry: "업계·사업",

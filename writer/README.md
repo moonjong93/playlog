@@ -53,6 +53,7 @@ uv run writer doctor
 | `writer doctor` | DB/모델 키/API 키 점검 |
 | `writer cluster [--lookback 36] [--dry-run]` | 묶기+RAG+선별. LLM 없음 |
 | `writer write --story-id N` | 스토리 하나 초안+편집+md |
+| `writer feature --file 특집.md` | 수동 특집 원고를 웹에 발행 |
 | `writer stories` | 최근 스토리 |
 | `writer run [--once] [--dry-run] [--no-write]` | 주기 실행 |
 | `writer bench` / `writer batch` | `.env BENCH_MODELS` 로 경합. **발행하지 않는다** |
@@ -108,6 +109,42 @@ BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai
 `translate` 는 싸다. 한국어 문장·고유명사·사실 날조를 먼저 본다. `write` 는 실제 기자 프롬프트라 더 비싸지만 본게임 품질에 가깝다.
 
 벤치는 thinking 을 끈다 (`reasoning.effort=none`, Qwen 은 `/no_think`). 고유명사는 원문 유지가 기본이다.
+
+---
+
+# 수동 특집
+
+자동 파이프라인(story) 밖의 장문 원고는 `writer feature` 로 발행한다. YAML front matter + 마크다운 한 파일이면 된다.
+
+```bash
+uv run writer feature --file features/pubg-asia-stars-2026-bangple.md --dry-run
+uv run writer feature --file features/pubg-asia-stars-2026-bangple.md
+```
+
+```markdown
+---
+slug: my-feature
+title: 제목
+lede: |
+  리드 첫 줄
+  리드 둘째 줄
+tags: [특집, PUBG]        # 최대 3개. 키를 빼면 재발행 시 웹의 기존 태그를 유지한다
+sources:
+  - name: 연합뉴스
+    url: https://...
+    role: news
+---
+## 소제목
+본문 **굵게** *기울임* [링크](https://...)
+
+> 인용
+
+- 목록
+```
+
+본문은 `##`/`###`, 인용(`>`), 목록(`-`/`1.`), 구분선(`---`), 굵게·기울임·링크를 지원한다.
+`published_at` 을 front matter에 넣지 않으면 발행 시각이 쓰인다. 같은 슬러그로 다시 실행하면 수정(HTTP 200)된다.
+`"특집"` 태그가 붙으면 웹 피드·기사 상단에 특집 배지가 뜬다.
 
 ---
 

@@ -3,6 +3,7 @@ import { newsArticleJsonLd } from "../seo.ts";
 import { SITE_NAME } from "../site.ts";
 import {
   articleSources,
+  featureBadge,
   formatRelativeTime,
   formatTime,
   groupSources,
@@ -180,6 +181,7 @@ export function articlePage(options: {
     ],
     current: "article",
     body: html`<article>
+      ${featureBadge(tags) ? html`<div class="mb-2">${featureBadge(tags)}</div>` : ""}
       <div class="flex items-start justify-between gap-x-4">
         <h1
           class="min-w-0 text-headline-xl max-md:text-headline-xl-mobile font-headline-xl font-bold text-on-surface tracking-tight leading-tight"
