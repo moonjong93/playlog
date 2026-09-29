@@ -73,7 +73,8 @@ class OpenRouterChat:
     def __init__(self, base_url: str, api_key: str, *,
                  timeout: float = 45.0, max_retries: int = 4,
                  min_interval: float = 0.5, reasoning_effort: str = "",
-                 exclude_reasoning: bool = False) -> None:
+                 exclude_reasoning: bool = False,
+                 provider_order: str = "") -> None:
         if not api_key:
             raise RuntimeError(
                 "OpenRouter 키가 필요합니다. .env 에 OPENROUTER_API_KEY= 를 넣어라"
@@ -83,6 +84,8 @@ class OpenRouterChat:
         self.min_interval = min_interval
         self.reasoning_effort = reasoning_effort.strip().lower()
         self.exclude_reasoning = exclude_reasoning
+        # OpenRouter 프로바이더 고정(쉼표 구분 slug). 비우면 기존 라우팅(가격 변동 있음).
+        self.provider_order = [p.strip() for p in provider_order.split(",") if p.strip()]
         self._last_request = 0.0
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout, connect=10.0),
@@ -167,6 +170,9 @@ class OpenRouterChat:
         reasoning = self._reasoning_payload(model)
         if reasoning:
             body["reasoning"] = reasoning
+        if self.provider_order:
+            # 고가 엔드포인트(예: OpenInference 출력 $1.25/M) 회피용. 실패 시에만 폴백 허용.
+            body["provider"] = {"order": self.provider_order, "allow_fallbacks": True}
         return self._post(body)
 
     def _post(self, body: dict) -> dict:

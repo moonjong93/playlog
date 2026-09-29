@@ -138,6 +138,31 @@ def test_does_not_send_reasoning_by_default():
     assert "reasoning" not in seen["body"]
 
 
+def test_provider_order_pins_routing():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return _ok({"title_ko": "T", "lede_ko": "L", "body_md": "B"})
+
+    _chat(handler, provider_order="deepinfra, relace").complete(
+        model="deepseek/deepseek-v4-flash-0731", system="s", user="u",
+        temperature=0.2, max_tokens=100,
+    )
+    assert seen["body"]["provider"] == {"order": ["deepinfra", "relace"], "allow_fallbacks": True}
+
+
+def test_provider_order_not_sent_by_default():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return _ok({"title_ko": "T", "lede_ko": "L", "body_md": "B"})
+
+    _chat(handler).complete(model="m", system="s", user="u", temperature=0.2, max_tokens=100)
+    assert "provider" not in seen["body"]
+
+
 def test_empty_length_fails_fast():
     def handler(request):
         return httpx.Response(200, json={

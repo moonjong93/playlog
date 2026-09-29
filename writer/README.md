@@ -104,6 +104,12 @@ BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai
 
 현재 기본 `WRITER_MODEL=deepseek/deepseek-v4-flash-0731` (run-34: 20케이스 $0.0027·한자누출 0·luna 대비 1/2 비용, 4배 느림). v4.1-flash 는 더 자세하지만 케이스당 3.6배 비싸고 3배 느려서 접었다. luna 는 빠르지만 "역할놀이 게임"(RPG) 같은 직역이 나온다.
 
+비용·실패 가드 (2026-09-29 추가):
+
+- `WRITER_REASONING=high` — thinking effort. 지정하지 않으면 모델 기본(max)으로 돌아 사고가 `WRITER_MAX_TOKENS`까지 폭주한 뒤 본문 없이 끝나는 "빈 응답"이 잦았다. **빈 응답도 생성 토큰만큼 과금된다.**
+- `WRITER_MAX_TOKENS=16000` — 실패 1건이 태울 수 있는 토큰 상한. 성공 콜은 실제 생성량만 과금되므로 낮춰도 손해가 없다. 64000이던 시절엔 빈 응답 1건당 $0.02~0.08을 태웠다 (실측: 하루 16~22건).
+- `WRITER_PROVIDER_ORDER=deepinfra,relace` — OpenRouter 엔드포인트 고정(출력 $0.18 / $0.32). 비우면 같은 모델이 $1.25(OpenInference)로도 라우팅돼 청구가 4배까지 흔들린다.
+
 리포트 요약에 `한자누출`(한자·가나가 섞인 출력 건수)과 `원제누락`(로마자 원제를 안 쓴 건수)이 플래그로 붙는다. **출력은 고치지 않고 표시만** 한다. `write` 태스크는 요약(lede)도 같이 보여준다.
 
 `translate` 는 싸다. 한국어 문장·고유명사·사실 날조를 먼저 본다. `write` 는 실제 기자 프롬프트라 더 비싸지만 본게임 품질에 가깝다.

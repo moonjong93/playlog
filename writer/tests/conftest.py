@@ -62,6 +62,7 @@ def make_settings(tmp_path, **kw) -> Settings:
         min_interval=0.0,
         temperature=0.2,
         reasoning_effort="low",
+        provider_order="",
     )
     base.update(kw)
     return Settings(**base)

@@ -67,6 +67,7 @@ def _chat(settings, **kw) -> OpenRouterChat:
         "timeout": settings.timeout,
         "min_interval": settings.min_interval,
         "reasoning_effort": settings.reasoning_effort,
+        "provider_order": settings.provider_order,
     }
     opts.update(kw)
     return OpenRouterChat(settings.openrouter_base, settings.openrouter_api_key, **opts)

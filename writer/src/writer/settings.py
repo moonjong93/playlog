@@ -79,6 +79,7 @@ class Settings:
     min_interval: float
     temperature: float
     reasoning_effort: str
+    provider_order: str
 
 
 def load_settings() -> Settings:
@@ -122,9 +123,10 @@ def load_settings() -> Settings:
             "google/gemma-4-26b-a4b-it,google/gemma-4-31b-it,"
             "upstage/solar-pro4,google/gemini-2.5-flash-lite,openai/gpt-5.6-luna",
         ),
-        max_tokens=_int("WRITER_MAX_TOKENS", 10000),
+        max_tokens=_int("WRITER_MAX_TOKENS", 16000),
         timeout=_float("WRITER_TIMEOUT", 180.0),
         min_interval=_float("WRITER_MIN_INTERVAL", 0.5),
         temperature=_float("WRITER_TEMPERATURE", 0.3),
-        reasoning_effort=_str("WRITER_REASONING", ""),
+        reasoning_effort=_str("WRITER_REASONING", "high"),
+        provider_order=_str("WRITER_PROVIDER_ORDER", ""),
     )
