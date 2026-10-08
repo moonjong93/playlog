@@ -112,6 +112,7 @@ class OpenRouterChat:
                  strict_json: bool = True) -> LLMResult:
         data = self._complete_once(
             model, system, self._user_text(model, user), temperature, max_tokens,
+            strict_json=strict_json,
         )
         choice = (data.get("choices") or [{}])[0]
         text = _choice_text(choice)
@@ -168,7 +169,7 @@ class OpenRouterChat:
         return None
 
     def _complete_once(self, model: str, system: str, user: str,
-                       temperature: float, max_tokens: int) -> dict:
+                       temperature: float, max_tokens: int, *, strict_json: bool) -> dict:
         body: dict = {
             "model": model,
             "messages": [
@@ -178,6 +179,8 @@ class OpenRouterChat:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if strict_json:
+            body["response_format"] = {"type": "json_object"}
         reasoning = self._reasoning_payload(model)
         if reasoning:
             body["reasoning"] = reasoning

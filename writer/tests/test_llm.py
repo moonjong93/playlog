@@ -83,6 +83,38 @@ def test_writer_agent_fills_pack():
     assert r.data["body_md"] == "B"
 
 
+def test_strict_json_requests_json_object_format():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return _ok({"title_ko": "제목", "lede_ko": "리드", "body_md": "본문"})
+
+    _chat(handler).complete(
+        model="anthropic/claude-haiku-5.5", system="s", user="u",
+        temperature=0.2, max_tokens=100,
+    )
+    assert seen["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_non_strict_json_does_not_request_json_object_format():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={
+            "id": "gen-plain", "model": "test/translate",
+            "choices": [{"message": {"content": "not JSON"}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        })
+
+    _chat(handler).complete(
+        model="test/translate", system="s", user="u", temperature=0.2,
+        max_tokens=100, strict_json=False,
+    )
+    assert "response_format" not in seen["body"]
+
+
 def test_exclude_reasoning_flag():
     seen = {}
 
