@@ -24,6 +24,17 @@ class _Retryable(Exception):
         self.retry_after = retry_after
 
 
+class OpenRouterLimitError(RuntimeError):
+    """OpenRouter rejected an inference request for credits or a key budget."""
+
+    def __init__(self, status: int, detail: str) -> None:
+        self.status_code = status
+        # OpenRouter sometimes includes a key-management URL containing the
+        # key hash in this error. The hash is not needed for runtime logs.
+        detail = re.sub(r"(/keys/)[0-9a-f]{64}", r"\1[redacted]", detail, flags=re.I)
+        super().__init__(f"HTTP {status}: {detail[:400]}")
+
+
 @dataclass
 class LLMResult:
     text: str
@@ -195,7 +206,12 @@ class OpenRouterChat:
         resp = self._client.post(f"{self.base}/chat/completions", json=body)
         self._last_request = time.monotonic()
         if resp.status_code >= 400 and resp.status_code not in _RETRYABLE:
-            raise RuntimeError(f"HTTP {resp.status_code}: {(resp.text or '')[:400]}")
+            detail = resp.text or ""
+            if resp.status_code == 402 or (
+                resp.status_code == 403 and "key limit exceeded" in detail.lower()
+            ):
+                raise OpenRouterLimitError(resp.status_code, detail)
+            raise RuntimeError(f"HTTP {resp.status_code}: {detail[:400]}")
         if resp.status_code in _RETRYABLE:
             raw = resp.headers.get("Retry-After")
             try:

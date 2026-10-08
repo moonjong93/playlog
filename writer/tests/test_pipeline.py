@@ -328,3 +328,61 @@ def test_write_story_republish_translates_comments_again(conn, tmp_path, monkeyp
     assert "tags" not in sent[1]
     n = conn.execute("SELECT COUNT(*) c FROM articles").fetchone()["c"]
     assert n == 1
+
+
+def _seed_independent_stories(conn, s, count: int = 3) -> None:
+    vectors = (v(1, 0, 0, 0), v(0, 1, 0, 0), v(0, 0, 1, 0))
+    names = ("Amber", "Birch", "Cinder")
+    for i in range(count):
+        source = add_source(conn, f"Source {i}", weight=1.5)
+        add_item(
+            conn, source, f"{names[i % len(names)]} Project launch announced",
+            desc=f"{names[i % len(names)]} Project launch announced today. " + "x" * 250,
+            vec=vectors[i % len(vectors)],
+        )
+    run_once(conn, s, write=False)
+
+
+def test_run_once_caps_pending_writer_queue(conn, tmp_path):
+    s = make_settings(tmp_path, max_per_run=1)
+    _seed_independent_stories(conn, s, count=3)
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        payload = {"title_ko": "공식 발표", "lede_ko": "오늘 공개됐다.", "body_md": "본문이다."}
+        return _llm_reply(json.dumps(payload, ensure_ascii=False))
+
+    stats = run_once(conn, s, chat=_chat(handler))
+
+    assert calls["n"] == 1
+    assert stats["articles_written"] == 1
+    assert stats["write_blocked"] is False
+    assert stats["write_queue_remaining"] == 2
+    statuses = [r["status"] for r in conn.execute("SELECT status FROM stories ORDER BY id")]
+    assert statuses.count("published") == 1
+    assert statuses.count("clustered") == 2
+
+
+@pytest.mark.parametrize(("status", "message"), [
+    (402, "This request requires more credits"),
+    (403, "Key limit exceeded (daily limit)"),
+])
+def test_run_once_stops_queue_after_openrouter_limit_error(conn, tmp_path, status, message):
+    s = make_settings(tmp_path)
+    _seed_independent_stories(conn, s, count=3)
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(status, json={"error": {"code": status, "message": message}})
+
+    stats = run_once(conn, s, chat=_chat(handler))
+
+    assert calls["n"] == 1
+    assert stats["articles_written"] == 0
+    assert stats["write_blocked"] is True
+    assert stats["write_queue_remaining"] == 3
+    run = conn.execute("SELECT status, error FROM writer_runs ORDER BY id DESC LIMIT 1").fetchone()
+    assert run["status"] == "error"
+    assert f"HTTP {status}" in run["error"]

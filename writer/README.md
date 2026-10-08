@@ -102,13 +102,14 @@ uv run writer bench show --run-id 6
 BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai/gpt-5.6-luna,google/gemma-4-31b-it,upstage/solar-pro4
 ```
 
-현재 기본 `WRITER_MODEL=deepseek/deepseek-v4-flash-0731` (run-34: 20케이스 $0.0027·한자누출 0·luna 대비 1/2 비용, 4배 느림). v4.1-flash 는 더 자세하지만 케이스당 3.6배 비싸고 3배 느려서 접었다. luna 는 빠르지만 "역할놀이 게임"(RPG) 같은 직역이 나온다.
+기본 모델은 `WRITER_MODEL=anthropic/claude-haiku-5.5`, `WRITER_REASONING=low`다. 게임 단신은 고급 추론보다 원문 충실도와 자연스러운 한국어가 우선이다. 모델이나 provider를 바꿀 때는 소량 벤치 후 발행한다.
 
 비용·실패 가드 (2026-09-29 추가):
 
-- `WRITER_REASONING=high` — thinking effort. 지정하지 않으면 모델 기본(max)으로 돌아 사고가 `WRITER_MAX_TOKENS`까지 폭주한 뒤 본문 없이 끝나는 "빈 응답"이 잦았다. **빈 응답도 생성 토큰만큼 과금된다.**
-- `WRITER_MAX_TOKENS=16000` — 실패 1건이 태울 수 있는 토큰 상한. 성공 콜은 실제 생성량만 과금되므로 낮춰도 손해가 없다. 64000이던 시절엔 빈 응답 1건당 $0.02~0.08을 태웠다 (실측: 하루 16~22건).
-- `WRITER_PROVIDER_ORDER=deepinfra,relace` — OpenRouter 엔드포인트 고정(출력 $0.18 / $0.32). 비우면 같은 모델이 $1.25(OpenInference)로도 라우팅돼 청구가 4배까지 흔들린다.
+- `WRITER_REASONING=low` — writer와 댓글 번역에 함께 적용한다. `high`는 reasoning 토큰을 크게 늘릴 수 있고, reasoning만 출력한 빈 응답도 생성 토큰만큼 과금된다.
+- `WRITER_MAX_TOKENS=16000` — 출력 상한이며 상한 전체가 바로 청구되지는 않는다. 다만 잔액이 작을 때는 OpenRouter가 이 상한으로 요청 비용을 사전 추정해 402로 거절할 수 있다.
+- `WRITER_MAX_PER_RUN=20` — writer 한 주기에서 시도할 스토리 수 상한. 넘는 clustered 스토리는 대기열에 남겨 다음 주기에 처리한다. `0`이면 제한이 없다.
+- `WRITER_PROVIDER_ORDER` — 비우면 OpenRouter 기본 라우팅을 사용한다. 특정 provider를 지정하려면 해당 모델에서 가격과 fallback 동작을 먼저 검증한다. DeepSeek에서 DeepInfra가 429를 반환해 Relace로 fallback한 사례가 있었다.
 
 리포트 요약에 `한자누출`(한자·가나가 섞인 출력 건수)과 `원제누락`(로마자 원제를 안 쓴 건수)이 플래그로 붙는다. **출력은 고치지 않고 표시만** 한다. `write` 태스크는 요약(lede)도 같이 보여준다.
 
@@ -165,7 +166,7 @@ sources:
 - 0.70~0.80 → 새 스토리 + `related`
 - 발행 전에 커뮤니티(레딧) 댓글을 한국어로 번역해 `sources[].comments` 로 보낸다
   (댓글이 있을 때만 호출, 실패하면 원문 유지하고 발행은 계속. `llm_usage.role='translate'`)
-- `WRITER_MAX_PER_RUN` > 0 이면 한 주기 상한 (기본 0 = 무제한). 초과분은 소비하지 않고 다음 주기로 넘긴다.
+- `WRITER_MAX_PER_RUN` > 0 이면 한 주기의 writer 시도 수를 제한한다. 초과 스토리는 clustered 상태로 대기해 다음 주기에 이어 쓴다 (기본값 20).
 
 RAG: 시드 센트로이드로 7일 창을 전수 내적. 기사 0.65+ top-8, 커뮤니티 0.50+ top-3(반응/댓글이 있는 글 우선). 0.72 미만 retrieved 는 팩에만 넣고 소비하지 않는다.
 

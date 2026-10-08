@@ -10,7 +10,7 @@ from .agents import load_prompts, prompt_version, run_writer
 from .assign import has_body_material, prepare, should_write
 from .cluster import claimed_hits, cluster_articles, expand
 from .db import Conn, consumed_ids, iso_days_ago, iso_hours_ago, load_batch, load_recent_stories, load_window, utcnow
-from .llm import OpenRouterChat
+from .llm import OpenRouterChat, OpenRouterLimitError
 from .models import Cluster, Hit, Prepared, StoryRow
 from .pack import build_pack, source_lines
 from .publish import ascii_slug, ingest_payload, normalize_tags, post_article, render_markdown, write_file
@@ -259,6 +259,7 @@ def run_once(conn: Conn, settings: Settings, *, lookback: int | None = None,
 
     run_id = store.start_run(conn)
     error = None
+    write_blocked = None
     articles = 0
     persist_stats = {"stories_new": 0, "stories_updated": 0, "claimed": 0}
     try:
@@ -270,7 +271,15 @@ def run_once(conn: Conn, settings: Settings, *, lookback: int | None = None,
                 raise RuntimeError("write=True 인데 OpenRouter 클라이언트가 없다")
             prompts = load_prompts(settings.prompts_file)
             pver = prompt_version(settings.prompts_file)
-            pending = store.pending_write_ids(conn)
+            pending_all = store.pending_write_ids(conn)
+            pending = pending_all
+            if settings.max_per_run > 0:
+                pending = pending_all[:settings.max_per_run]
+                if len(pending_all) > len(pending):
+                    log.info(
+                        "작성 상한 %d/%d편 — 나머지 스토리는 다음 주기로 보류",
+                        len(pending), len(pending_all),
+                    )
             for i, sid in enumerate(pending, 1):
                 if should_stop and should_stop():
                     log.info("중단 — 남은 %d편은 다음 주기", len(pending) - i + 1)
@@ -287,13 +296,21 @@ def run_once(conn: Conn, settings: Settings, *, lookback: int | None = None,
                     write_story(conn, settings, chat, story_id=sid, run_id=run_id,
                                 prompts=prompts, pver=pver)
                     articles += 1
+                except OpenRouterLimitError as exc:
+                    write_blocked = str(exc)
+                    log.error(
+                        "OpenRouter 크레딧/키 한도 거절 — 이번 주기 중단, 남은 %d편은 대기: %s",
+                        len(pending) - i + 1, exc,
+                    )
+                    break
                 except Exception as exc:  # noqa: BLE001
                     log.error("story %s 쓰기 실패: %s", sid, exc)
         store.finish_run(
-            conn, run_id, status="ok", items_seen=len(candidates),
+            conn, run_id, status="error" if write_blocked else "ok",
+            items_seen=len(candidates),
             stories_new=persist_stats["stories_new"],
             stories_updated=persist_stats["stories_updated"],
-            articles_written=articles,
+            articles_written=articles, error=write_blocked,
         )
     except Exception as exc:  # noqa: BLE001
         error = str(exc)
@@ -312,4 +329,7 @@ def run_once(conn: Conn, settings: Settings, *, lookback: int | None = None,
         "plan": plan,
         **persist_stats,
         "articles_written": articles,
+        "write_blocked": write_blocked is not None,
+        "write_block_reason": write_blocked,
+        "write_queue_remaining": len(store.pending_write_ids(conn)) if write else None,
     }

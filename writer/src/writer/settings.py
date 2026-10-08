@@ -88,7 +88,7 @@ def load_settings() -> Settings:
     root = PROJECT_ROOT
     default_db = root.parent / "collector" / "data" / "news.db"
     api_key = _str("OPENROUTER_API_KEY") or _str("WRITER_API_KEY")
-    writer_model = _str("WRITER_MODEL", "openai/gpt-5.6-luna")
+    writer_model = _str("WRITER_MODEL", "anthropic/claude-haiku-5.5")
     editor_model = _str("EDITOR_MODEL") or writer_model
     return Settings(
         db_path=Path(_str("NEWS_DB") or _str("COLLECTOR_DB") or str(default_db)).expanduser(),
@@ -109,7 +109,7 @@ def load_settings() -> Settings:
         rag_community_k=_int("RAG_COMMUNITY_K", 3),
         min_singleton_desc=_int("MIN_SINGLETON_DESC", 200),
         min_singleton_weight=_float("MIN_SINGLETON_WEIGHT", 1.5),
-        max_per_run=_int("WRITER_MAX_PER_RUN", 0),
+        max_per_run=_int("WRITER_MAX_PER_RUN", 20),
         batch_limit=_int("WRITER_BATCH", 100),
         web_url=_str("WEB_URL").rstrip("/"),
         web_api_key=_str("WEB_API_KEY") or _str("WEB_INGEST_TOKEN"),
@@ -127,6 +127,6 @@ def load_settings() -> Settings:
         timeout=_float("WRITER_TIMEOUT", 180.0),
         min_interval=_float("WRITER_MIN_INTERVAL", 0.5),
         temperature=_float("WRITER_TEMPERATURE", 0.3),
-        reasoning_effort=_str("WRITER_REASONING", "high"),
+        reasoning_effort=_str("WRITER_REASONING", "low"),
         provider_order=_str("WRITER_PROVIDER_ORDER", ""),
     )

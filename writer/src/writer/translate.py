@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Callable
 
-from .llm import LLMResult, OpenRouterChat
+from .llm import LLMResult, OpenRouterChat, OpenRouterLimitError
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +92,10 @@ def translate_comments(chat: OpenRouterChat, comments: list[dict], *, model: str
             model=model, system=SYSTEM, user=_user_text(original),
             temperature=temperature, max_tokens=max_tokens, strict_json=False,
         )
+    except OpenRouterLimitError:
+        # A balance/key-limit rejection applies to the whole run; do not hide
+        # it as a one-off translation fallback and send another request.
+        raise
     except Exception as exc:  # noqa: BLE001
         log.warning("댓글 번역 실패(호출) — 원문 유지: %s", exc)
         return original

@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 
-from writer.llm import OpenRouterChat
+from writer.llm import OpenRouterChat, OpenRouterLimitError
 from writer.translate import translate_comments
 
 
@@ -102,6 +103,16 @@ def test_translate_falls_back_on_http_error():
         return httpx.Response(500, json={"error": "boom"})
 
     assert translate_comments(_chat(handler, max_retries=0), COMMENTS, model="m") == COMMENTS
+
+
+def test_translate_propagates_openrouter_limit_error():
+    def handler(request):
+        return httpx.Response(403, json={
+            "error": {"code": 403, "message": "Key limit exceeded (daily limit)"},
+        })
+
+    with pytest.raises(OpenRouterLimitError, match="HTTP 403"):
+        translate_comments(_chat(handler), COMMENTS, model="m")
 
 
 def test_translate_skips_when_every_comment_is_korean():
