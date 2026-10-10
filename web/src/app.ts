@@ -14,6 +14,8 @@ import { LEGACY_SECTION_TAGS, normalizeTags } from "./tags.ts";
 import { allTags, replaceTags, tagTotal, tagsFor } from "./tagStore.ts";
 import { PAGE_SIZE, feedPage } from "./pages/feed.ts";
 import { tagsPage } from "./pages/tags.ts";
+import { DEAL_SORTS, type DealSort, dealsMeta, listDeals } from "./deals.ts";
+import { MIN_DISCOUNTS, dealsPage } from "./pages/deals.ts";
 import { articlePage, type RelatedRow } from "./pages/article.ts";
 import {
   QUERY_MAX,
@@ -330,6 +332,16 @@ app.get("/tags", (c) => {
   );
 });
 
+app.get("/deals", (c) => {
+  const rawSort = c.req.query("sort") ?? "";
+  const sort: DealSort = rawSort in DEAL_SORTS ? (rawSort as DealSort) : "popular";
+  const rawMin = Number(c.req.query("min") ?? "0");
+  const min = (MIN_DISCOUNTS as readonly number[]).includes(rawMin) ? rawMin : 0;
+  return c.html(
+    dealsPage({ deals: listDeals(sort, min), sort, min, ...dealsMeta(), origin: originOf(c) }),
+  );
+});
+
 /** 푸터 안내·법적 문서. 읽기 전용 정적 페이지라 DB를 쓰지 않는다. */
 app.get("/about", (c) => c.html(aboutPage({ origin: originOf(c) })));
 app.get("/privacy", (c) => c.html(privacyPage({ origin: originOf(c) })));
@@ -453,7 +465,7 @@ app.get("/sitemap.xml", (c) => {
       homeLast ? `<lastmod>${xmlEscape(homeLast)}</lastmod>` : ""
     }</url>`,
   );
-  for (const path of ["/about", "/privacy", "/terms", "/contact"]) {
+  for (const path of ["/deals", "/about", "/privacy", "/terms", "/contact"]) {
     entries.push(`  <url><loc>${xmlEscape(`${origin}${path}`)}</loc></url>`);
   }
   for (const row of tags) {

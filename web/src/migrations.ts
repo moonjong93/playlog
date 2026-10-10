@@ -74,6 +74,25 @@ function backfillSearchText(db: Database): void {
   for (const row of rows) update.run(toSearchText(row.body_html), row.slug);
 }
 
+/** v4: Steam 할인 목록(/deals). 수집기가 주기적으로 통째로 갱신한다. */
+const V4 = `
+CREATE TABLE IF NOT EXISTS deals (
+  app_id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  discount_pct INTEGER NOT NULL,
+  original_price INTEGER NOT NULL,
+  final_price INTEGER NOT NULL,
+  image_url TEXT,
+  review_pct INTEGER,
+  review_count INTEGER,
+  review_label TEXT,
+  expires_at TEXT,
+  rank INTEGER NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  seen_at TEXT NOT NULL
+);
+`;
+
 export const migrations: Migration[] = [
   { version: 1, up: (db) => db.exec(V1) },
   {
@@ -84,6 +103,7 @@ export const migrations: Migration[] = [
     },
   },
   { version: 3, up: (db) => db.exec(V3) },
+  { version: 4, up: (db) => db.exec(V4) },
 ];
 
 /** PRAGMA user_version 기준으로 미적용 마이그레이션만 순서대로 실행한다. */

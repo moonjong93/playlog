@@ -214,7 +214,7 @@ export function summaryBox(lede: string) {
   </div>`;
 }
 
-export type NavCurrent = "feed" | "article" | "search" | "tags" | "none";
+export type NavCurrent = "feed" | "article" | "search" | "tags" | "deals" | "none";
 
 function navLink(
   href: string,
@@ -271,6 +271,7 @@ function siteHeader(options: {
     ),
   )}
           ${navLink("/tags", "전체보기", options.current === "tags")}
+          ${navLink("/deals", "할인", options.current === "deals")}
         </nav>
       </div>
       <div class="flex items-center gap-3 shrink-0">
