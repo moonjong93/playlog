@@ -14,8 +14,17 @@ import { LEGACY_SECTION_TAGS, normalizeTags } from "./tags.ts";
 import { allTags, replaceTags, tagTotal, tagsFor } from "./tagStore.ts";
 import { PAGE_SIZE, feedPage } from "./pages/feed.ts";
 import { tagsPage } from "./pages/tags.ts";
-import { DEAL_SORTS, type DealSort, dealsMeta, listDeals } from "./deals.ts";
-import { MIN_DISCOUNTS, dealsPage } from "./pages/deals.ts";
+import {
+  DEAL_SORTS,
+  type DealSort,
+  dealsMeta,
+  getDeal,
+  listDeals,
+  lowestPrices,
+  priceHistory,
+  priceHistoryUiEnabled,
+} from "./deals.ts";
+import { MIN_DISCOUNTS, dealDetailPage, dealsPage } from "./pages/deals.ts";
 import { articlePage, type RelatedRow } from "./pages/article.ts";
 import {
   QUERY_MAX,
@@ -338,8 +347,23 @@ app.get("/deals", (c) => {
   const rawMin = Number(c.req.query("min") ?? "0");
   const min = (MIN_DISCOUNTS as readonly number[]).includes(rawMin) ? rawMin : 0;
   return c.html(
-    dealsPage({ deals: listDeals(sort, min), sort, min, ...dealsMeta(), origin: originOf(c) }),
+    dealsPage({
+      deals: listDeals(sort, min),
+      sort,
+      min,
+      ...dealsMeta(),
+      lowest: priceHistoryUiEnabled() ? lowestPrices() : undefined,
+      origin: originOf(c),
+    }),
   );
+});
+
+/** 가격 이력 상세. DEALS_PRICE_UI=1 일 때만 열린다(수집은 항상 한다). */
+app.get("/deals/:appId", (c) => {
+  const appId = Number(c.req.param("appId"));
+  const deal = priceHistoryUiEnabled() && Number.isInteger(appId) ? getDeal(appId) : undefined;
+  if (!deal) return c.html(pageNotFoundPage(), 404);
+  return c.html(dealDetailPage({ deal, points: priceHistory(appId), origin: originOf(c) }));
 });
 
 /** 푸터 안내·법적 문서. 읽기 전용 정적 페이지라 DB를 쓰지 않는다. */

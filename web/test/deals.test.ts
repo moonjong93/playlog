@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { app, cleanup, query, run } from "./helpers.ts";
 import { parseFeatured, parseSearchHtml, saveDeals } from "../src/deals.ts";
+import { priceChartSvg } from "../src/pages/deals.ts";
 
 afterAll(() => cleanup());
 
@@ -67,7 +68,11 @@ const mk = (id: number, pct: number, price: number) => ({
 });
 
 describe("saveDeals + /deals", () => {
-  beforeEach(() => run("DELETE FROM deals"));
+  beforeEach(() => {
+    run("DELETE FROM deals");
+    run("DELETE FROM price_history");
+    delete process.env.DEALS_PRICE_UI;
+  });
 
   it("재수집 시 사라진 행은 지우고 first_seen_at 은 보존한다", () => {
     saveDeals([mk(1, 50, 1000), mk(2, 30, 500)], new Map(), "2026-01-01T00:00:00.000Z");
@@ -111,5 +116,51 @@ describe("saveDeals + /deals", () => {
   it("헤더 네비와 sitemap 에 노출된다", async () => {
     expect(await (await app.request("/")).text()).toContain('href="/deals"');
     expect(await (await app.request("/sitemap.xml")).text()).toContain("/deals</loc>");
+  });
+});
+
+describe("가격 이력", () => {
+  beforeEach(() => {
+    run("DELETE FROM deals");
+    run("DELETE FROM price_history");
+    delete process.env.DEALS_PRICE_UI;
+  });
+  const hist = () =>
+    query<{ app_id: number; final_price: number; discount_pct: number }>(
+      "SELECT app_id, final_price, discount_pct FROM price_history ORDER BY id",
+    );
+
+  it("가격이 바뀔 때만 기록하고, 할인 종료는 정가로 기록한다", () => {
+    saveDeals([mk(1, 50, 1000)], new Map(), "2026-01-01T00:00:00.000Z");
+    saveDeals([mk(1, 50, 1000)], new Map(), "2026-01-01T01:00:00.000Z"); // 동일 → 기록 안 함
+    saveDeals([mk(1, 70, 600)], new Map(), "2026-01-02T00:00:00.000Z"); // 변동
+    saveDeals([mk(2, 10, 900)], new Map(), "2026-01-03T00:00:00.000Z"); // 1번 종료
+    expect(hist()).toEqual([
+      { app_id: 1, final_price: 1000, discount_pct: 50 },
+      { app_id: 1, final_price: 600, discount_pct: 70 },
+      { app_id: 2, final_price: 900, discount_pct: 10 },
+      { app_id: 1, final_price: 1200, discount_pct: 0 },
+    ]);
+  });
+
+  it("UI 스위치가 꺼져 있으면 상세는 404, 켜면 그래프가 나온다", async () => {
+    saveDeals([mk(1, 50, 1000)], new Map(), "2026-01-01T00:00:00.000Z");
+    saveDeals([mk(1, 70, 600)], new Map(), "2026-01-02T00:00:00.000Z");
+    expect((await app.request("/deals/1")).status).toBe(404);
+    expect(await (await app.request("/deals")).text()).not.toContain("수집 이후 최저가");
+
+    process.env.DEALS_PRICE_UI = "1";
+    const res = await app.request("/deals/1");
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("<svg");
+    expect(body).toContain("Steam에서 보기");
+    expect(await (await app.request("/deals")).text()).toContain("수집 이후 최저가");
+    expect((await app.request("/deals/999")).status).toBe(404);
+    expect((await app.request("/deals/abc")).status).toBe(404);
+  });
+
+  it("점이 1개면 그래프를 그리지 않는다", () => {
+    expect(priceChartSvg([])).toBe("");
   });
 });

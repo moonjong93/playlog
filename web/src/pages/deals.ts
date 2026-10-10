@@ -1,9 +1,11 @@
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import {
   DEAL_SORTS,
   type DealRow,
   type DealSort,
   NEW_WINDOW_MS,
+  type PricePoint,
+  priceHistoryUiEnabled,
 } from "../deals.ts";
 import { SITE_NAME } from "../site.ts";
 import { formatRelativeTime, layout } from "./layout.ts";
@@ -38,7 +40,9 @@ function chip(label: string, href: string, active: boolean) {
   return html`<a class="${cls}" href="${href}" ${active ? 'aria-current="true"' : ""}>${label}</a>`;
 }
 
-function dealCard(d: DealRow, showNew: boolean) {
+function dealCard(d: DealRow, showNew: boolean, lowest: Map<number, number>) {
+  const historyUi = priceHistoryUiEnabled();
+  const isLowest = historyUi && d.final_price <= (lowest.get(d.app_id) ?? -1);
   const isNew = showNew && Date.now() - Date.parse(d.first_seen_at) < NEW_WINDOW_MS;
   const left = d.expires_at ? remaining(d.expires_at) : null;
   const review =
@@ -48,9 +52,8 @@ function dealCard(d: DealRow, showNew: boolean) {
   return html`<li>
     <a
       class="deal-card flex gap-3 items-center p-2.5 bg-surface-container-low border border-outline-variant rounded hover:border-primary/60 transition-colors"
-      href="https://store.steampowered.com/app/${d.app_id}/"
-      target="_blank"
-      rel="noopener nofollow"
+      href="${historyUi ? `/deals/${d.app_id}` : `https://store.steampowered.com/app/${d.app_id}/`}"
+      ${historyUi ? "" : 'target="_blank" rel="noopener nofollow"'}
     >
       ${d.image_url
         ? html`<img
@@ -72,6 +75,7 @@ function dealCard(d: DealRow, showNew: boolean) {
         <div class="text-label-mono-sm font-label-mono-sm text-outline flex flex-wrap gap-x-3">
           ${review ? html`<span>${review}</span>` : ""}
           ${left ? html`<span class="text-tertiary">${left}</span>` : ""}
+          ${isLowest ? html`<span class="text-primary">수집 이후 최저가</span>` : ""}
         </div>
       </div>
       <div class="shrink-0 flex items-center gap-2 text-right">
@@ -91,6 +95,7 @@ export function dealsPage(options: {
   min: number;
   updatedAt: string | null;
   newBadges: boolean;
+  lowest?: Map<number, number>;
   origin?: string;
 }) {
   const { sort, min } = options;
@@ -125,10 +130,82 @@ export function dealsPage(options: {
       <div class="flex flex-wrap gap-2" aria-label="최소 할인율">${mins}</div>
       ${options.deals.length === 0
         ? empty
-        : html`<ul class="flex flex-col gap-2">${options.deals.map((d) => dealCard(d, options.newBadges))}</ul>`}
+        : html`<ul class="flex flex-col gap-2">${options.deals.map((d) => dealCard(d, options.newBadges, options.lowest ?? new Map()))}</ul>`}
       <p class="text-label-mono-sm font-label-mono-sm text-outline">
         가격은 Steam 스토어(한국) 기준이며 수집 시점 이후 바뀔 수 있습니다. 결제 전 스토어에서 최종 가격을 확인하세요.
       </p>
+    </div>`,
+  });
+}
+
+/** 가격 이력을 계단형 SVG 라인으로 그린다. 점이 1개면 빈 문자열(그릴 게 없다). */
+export function priceChartSvg(points: PricePoint[]): string {
+  if (points.length < 2) return "";
+  const W = 640, H = 220, L = 64, R = 12, T = 12, B = 28;
+  const times = points.map((p) => Date.parse(p.recorded_at));
+  const t0 = times[0];
+  const t1 = Math.max(Date.now(), times[times.length - 1]);
+  const prices = points.flatMap((p) => [p.final_price, p.original_price]);
+  const max = Math.max(...prices);
+  const min = Math.min(...points.map((p) => p.final_price), max);
+  const lo = Math.max(0, min - (max - min) * 0.1);
+  const x = (t: number) => L + ((t - t0) / Math.max(1, t1 - t0)) * (W - L - R);
+  const y = (v: number) => T + (1 - (v - lo) / Math.max(1, max - lo)) * (H - T - B);
+
+  let d = `M${x(times[0]).toFixed(1)},${y(points[0].final_price).toFixed(1)}`;
+  for (let i = 1; i < points.length; i++) {
+    d += ` H${x(times[i]).toFixed(1)} V${y(points[i].final_price).toFixed(1)}`;
+  }
+  d += ` H${x(t1).toFixed(1)}`;
+  const dateLabel = (t: number) => new Date(t).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+  const lowIdx = points.reduce((best, p, i) => (p.final_price < points[best].final_price ? i : best), 0);
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="가격 변화 그래프">
+  <line x1="${L}" y1="${y(max)}" x2="${W - R}" y2="${y(max)}" stroke="currentColor" stroke-opacity=".15"/>
+  <line x1="${L}" y1="${y(min)}" x2="${W - R}" y2="${y(min)}" stroke="currentColor" stroke-opacity=".15"/>
+  <text x="${L - 6}" y="${y(max) + 4}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">${won(max)}</text>
+  <text x="${L - 6}" y="${y(min) + 4}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">${won(min)}</text>
+  <text x="${L}" y="${H - 8}" font-size="11" fill="currentColor" fill-opacity=".6">${dateLabel(t0)}</text>
+  <text x="${W - R}" y="${H - 8}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">${dateLabel(t1)}</text>
+  <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"/>
+  <circle cx="${x(times[lowIdx]).toFixed(1)}" cy="${y(points[lowIdx].final_price).toFixed(1)}" r="4" class="text-primary" fill="currentColor"/>
+</svg>`;
+}
+
+export function dealDetailPage(options: {
+  deal: DealRow;
+  points: PricePoint[];
+  origin?: string;
+}) {
+  const { deal: d, points } = options;
+  const chart = priceChartSvg(points);
+  const lowest = points.length ? Math.min(...points.map((p) => p.final_price)) : d.final_price;
+  return layout({
+    title: `${d.title} 가격 추이 · ${SITE_NAME}`,
+    description: `${d.title}의 Steam 할인 가격 변화 기록.`,
+    current: "deals",
+    canonical: `/deals/${d.app_id}`,
+    origin: options.origin,
+    body: html`<div class="flex flex-col gap-4">
+      <a class="text-label-ui font-label-ui text-on-surface-variant hover:text-on-surface" href="/deals">← 할인 목록</a>
+      <h1 class="text-headline-lg font-headline-lg font-bold text-on-surface tracking-tight">${d.title}</h1>
+      <div class="flex flex-wrap items-center gap-3 text-body-md font-body-md">
+        <span class="px-2 py-1 rounded bg-primary/20 text-primary font-bold">-${d.discount_pct}%</span>
+        <span class="line-through text-outline">${won(d.original_price)}</span>
+        <span class="font-bold text-on-surface">${won(d.final_price)}</span>
+        <span class="text-label-mono-sm font-label-mono-sm text-outline">수집 이후 최저 ${won(lowest)}</span>
+      </div>
+      <div class="bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface">
+        ${chart
+          ? raw(chart)
+          : html`<p class="text-body-md font-body-md text-on-surface-variant">아직 가격 변화가 기록되지 않았습니다. 가격이 바뀌면 그래프가 그려집니다.</p>`}
+      </div>
+      <a
+        class="self-start px-3 py-1.5 rounded border border-primary/60 text-primary text-label-ui font-label-ui hover:bg-surface-variant"
+        href="https://store.steampowered.com/app/${d.app_id}/"
+        target="_blank"
+        rel="noopener nofollow"
+        >Steam에서 보기</a
+      >
     </div>`,
   });
 }

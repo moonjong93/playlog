@@ -93,6 +93,19 @@ CREATE TABLE IF NOT EXISTS deals (
 );
 `;
 
+/** v5: 할인 가격 이력. 가격이 바뀔 때만 한 줄씩 쌓는다(할인 종료 = 정가 복귀도 기록). */
+const V5 = `
+CREATE TABLE IF NOT EXISTS price_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  final_price INTEGER NOT NULL,
+  original_price INTEGER NOT NULL,
+  discount_pct INTEGER NOT NULL,
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_price_history_app ON price_history(app_id, recorded_at);
+`;
+
 export const migrations: Migration[] = [
   { version: 1, up: (db) => db.exec(V1) },
   {
@@ -104,6 +117,7 @@ export const migrations: Migration[] = [
   },
   { version: 3, up: (db) => db.exec(V3) },
   { version: 4, up: (db) => db.exec(V4) },
+  { version: 5, up: (db) => db.exec(V5) },
 ];
 
 /** PRAGMA user_version 기준으로 미적용 마이그레이션만 순서대로 실행한다. */

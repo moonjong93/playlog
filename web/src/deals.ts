@@ -119,6 +119,33 @@ export function parseFeatured(json: unknown): Map<number, string> {
   return out;
 }
 
+type HistoryRow = {
+  final_price: number;
+  original_price: number;
+  discount_pct: number;
+  recorded_at: string;
+};
+
+/** 마지막 기록과 다를 때만 이력을 한 줄 추가한다. */
+function recordPrice(
+  appId: number,
+  finalPrice: number,
+  originalPrice: number,
+  discountPct: number,
+  now: string,
+): void {
+  const last = queryOne<HistoryRow>(
+    "SELECT * FROM price_history WHERE app_id = ? ORDER BY id DESC LIMIT 1",
+    [appId],
+  );
+  if (last && last.final_price === finalPrice && last.original_price === originalPrice) return;
+  run(
+    `INSERT INTO price_history (app_id, final_price, original_price, discount_pct, recorded_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [appId, finalPrice, originalPrice, discountPct, now],
+  );
+}
+
 /** 새 목록으로 통째로 교체한다. 사라진 행(할인 종료)은 지우고 first_seen_at 은 보존한다. */
 export function saveDeals(
   deals: ParsedDeal[],
@@ -141,7 +168,15 @@ export function saveDeals(
         d.reviewPct, d.reviewCount, d.reviewLabel, expirations.get(d.appId) ?? null,
         i + 1, now, now,
       ]);
+      recordPrice(d.appId, d.finalPrice, d.originalPrice, d.discountPct, now);
     });
+    // 할인이 끝난 행은 정가로 돌아간 것으로 기록한 뒤 지운다(그래프가 끝나는 지점).
+    for (const ended of query<{ app_id: number; original_price: number }>(
+      "SELECT app_id, original_price FROM deals WHERE seen_at <> ?",
+      [now],
+    )) {
+      recordPrice(ended.app_id, ended.original_price, ended.original_price, 0, now);
+    }
     run("DELETE FROM deals WHERE seen_at <> ?", [now]);
   });
 }
@@ -172,6 +207,33 @@ export async function refreshDeals(): Promise<number> {
   }
   saveDeals(deals, expirations);
   return deals.length;
+}
+
+/** 가격 이력 UI(상세 그래프·최저가 배지) 노출 스위치. 수집은 항상 하고, 화면만 .env 로 켠다. */
+export function priceHistoryUiEnabled(): boolean {
+  return process.env.DEALS_PRICE_UI?.trim() === "1";
+}
+
+export type PricePoint = HistoryRow;
+
+export function priceHistory(appId: number): PricePoint[] {
+  return query<PricePoint>(
+    "SELECT final_price, original_price, discount_pct, recorded_at FROM price_history WHERE app_id = ? ORDER BY id",
+    [appId],
+  );
+}
+
+/** 수집 이후 최저가. 기록이 2건 미만이면 비교 의미가 없어 빼 둔다. */
+export function lowestPrices(): Map<number, number> {
+  const rows = query<{ app_id: number; low: number }>(
+    `SELECT app_id, MIN(final_price) AS low FROM price_history
+     GROUP BY app_id HAVING COUNT(*) >= 2`,
+  );
+  return new Map(rows.map((r) => [r.app_id, r.low]));
+}
+
+export function getDeal(appId: number): DealRow | undefined {
+  return queryOne<DealRow>("SELECT * FROM deals WHERE app_id = ?", [appId]);
 }
 
 export type DealSort = "popular" | "discount" | "price" | "new";
