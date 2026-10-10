@@ -4,7 +4,6 @@ import { html, raw } from "hono/html";
 import { env, rootDir } from "../env.ts";
 import { logoSvg } from "../brand.ts";
 import { FEATURE_TAG } from "../tags.ts";
-import { recentTags } from "../tagStore.ts";
 import { organizationJsonLd, websiteJsonLd } from "../seo.ts";
 import {
   DEFAULT_OG_PATH,
@@ -262,15 +261,7 @@ function siteHeader(options: {
             >
           </div>
         </a>
-        <nav class="hidden lg:flex items-center gap-6" aria-label="태그">
-          ${recentTags().map((tag) =>
-    navLink(
-      `/?tag=${encodeURIComponent(tag)}`,
-      `#${tag}`,
-      options.current === "feed" && activeTag === tag,
-    ),
-  )}
-          ${navLink("/tags", "전체보기", options.current === "tags")}
+        <nav class="hidden lg:flex items-center gap-6" aria-label="메뉴">
           ${navLink("/deals", "할인", options.current === "deals")}
         </nav>
       </div>
@@ -310,6 +301,14 @@ function siteHeader(options: {
             >
           </div>
         </form>
+        <a
+          href="/tags"
+          class="${options.current === "tags" ? "border-primary text-on-surface bg-surface-container-highest" : "border-outline-variant text-on-surface-variant hover:text-on-surface bg-surface-container hover:bg-surface-container-highest"} w-8 h-8 rounded border flex items-center justify-center transition-colors duration-150 ease-in-out"
+          aria-label="전체 태그"
+          title="전체 태그"
+        >
+          <span class="material-symbols-outlined text-[18px]">sell</span>
+        </a>
         <a
           href="/rss.xml"
           class="w-8 h-8 rounded border border-outline-variant bg-surface-container hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors duration-150 ease-in-out"

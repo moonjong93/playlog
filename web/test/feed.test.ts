@@ -20,7 +20,7 @@ function cards(html: string): string[] {
 }
 
 function headerNav(html: string): string {
-  const start = html.indexOf('aria-label="태그"');
+  const start = html.indexOf('aria-label="메뉴"');
   const end = html.indexOf("</nav>", start);
   return html.slice(start, end);
 }
@@ -73,14 +73,13 @@ describe("피드/기사", () => {
     expect(html).toContain(`href="/?tag=${encodeURIComponent("출시·패치")}"`);
   });
 
-  it("네비는 최근 태그와 전체보기 링크다", async () => {
+  it("헤더에 태그 아이콘이 /tags 로 링크한다(메뉴에는 #태그 없음)", async () => {
     const html = await (await app.request("/")).text();
     const nav = headerNav(html);
-    expect(nav).toContain("#출시·패치");
-    expect(nav).toContain("#발표·신작");
-    expect(nav).toContain('href="/tags"');
-    expect(nav).toContain("전체보기");
+    expect(nav).not.toContain("#출시·패치");
     expect(nav).not.toContain("?section=");
+    expect(html).toContain('href="/tags"');
+    expect(html).toContain('aria-label="전체 태그"');
   });
 
   it("없는 기사는 404 안내", async () => {

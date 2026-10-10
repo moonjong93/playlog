@@ -9,7 +9,7 @@ function cards(html: string): string[] {
 }
 
 function headerNav(html: string): string {
-  const start = html.indexOf('aria-label="태그"');
+  const start = html.indexOf('aria-label="메뉴"');
   const end = html.indexOf("</nav>", start);
   return html.slice(start, end);
 }
@@ -157,29 +157,13 @@ describe("태그 피드/목록", () => {
     expect(html).toContain(`href="/?tag=${encodeURIComponent("공통")}"`);
   });
 
-  it("네비는 최근 발행 태그 5개를 최신순으로 보여준다", async () => {
+  it("헤더 메뉴에는 #태그 목록이 없고, 태그 아이콘이 /tags 로 간다", async () => {
     const html = await (await app.request("/")).text();
     const nav = headerNav(html);
-    const expected = ["태그1", "태그2", "태그3", "태그4", "태그5"];
-    for (const tag of expected) {
-      expect(nav).toContain(`#${tag}`);
-    }
-    expect(nav).not.toContain("#태그6");
-    expect(nav).not.toContain("#공통");
-    const positions = expected.map((tag) => nav.indexOf(`#${tag}`));
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(nav).toContain('href="/tags"');
-    expect(nav).toContain("전체보기");
-  });
-
-  it("태그 필터 중에는 네비에서 활성 표시한다", async () => {
-    const html = await (
-      await app.request(`/?tag=${encodeURIComponent("태그1")}`)
-    ).text();
-    const nav = headerNav(html);
-    const at = nav.indexOf("#태그1");
-    const link = nav.slice(nav.lastIndexOf("<a ", at), at);
-    expect(link).toContain("border-b-2 border-primary");
+    expect(nav).not.toContain("#태그");
+    expect(nav).not.toContain("전체보기");
+    expect(html).toContain('href="/tags"');
+    expect(html).toContain('aria-label="전체 태그"');
   });
 
   it("/tags는 사용 횟수순 30개 + 페이징", async () => {
