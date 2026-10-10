@@ -62,7 +62,8 @@ import {
 import { type ArticleRow } from "./pages/layout.ts";
 import { logoPng, logoSvg, manifestJson } from "./brand.ts";
 import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "./site.ts";
+import { INDEXABLE_SQL, MIN_TAG_ARTICLES, isArticleIndexable, isTagIndexable } from "./indexing.ts";
+import { NOINDEX, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "./site.ts";
 
 type AppEnv = { Variables: { ip: string; sid: string } };
 
@@ -323,7 +324,14 @@ app.get("/", (c) => {
     [...filter, PAGE_SIZE, (page - 1) * PAGE_SIZE],
   );
   return c.html(
-    feedPage({ articles: withTags(articles), tag, page, total, origin: originOf(c) }),
+    feedPage({
+      articles: withTags(articles),
+      tag,
+      page,
+      total,
+      robots: tag && !isTagIndexable(tag) ? NOINDEX : undefined,
+      origin: originOf(c),
+    }),
   );
 });
 
@@ -399,6 +407,7 @@ app.get("/s/:slug", (c) => {
       sessionId: c.get("sid"),
       origin: originOf(c),
       related: relatedArticles(slug, tagged.tags ?? []),
+      robots: isArticleIndexable(slug) ? undefined : NOINDEX,
     }),
   );
 });
@@ -469,12 +478,15 @@ function imageBlock(origin: string, slug: string, title: string): string {
 app.get("/sitemap.xml", (c) => {
   const origin = originOf(c);
   const articles = query<SitemapArticle>(
-    "SELECT slug, title_ko, published_at, updated_at FROM articles ORDER BY published_at DESC",
+    `SELECT slug, title_ko, published_at, updated_at FROM articles
+     WHERE ${INDEXABLE_SQL} ORDER BY published_at DESC`,
   );
+  // 색인 대상 기사가 충분한 태그만 담는다(얇은 태그 페이지는 noindex).
   const tags = query<{ tag: string; last: string }>(
-    `SELECT t.tag AS tag, MAX(a.updated_at) AS last
-     FROM article_tags t JOIN articles a ON a.slug = t.slug
-     GROUP BY t.tag ORDER BY last DESC`,
+    `SELECT t.tag AS tag, MAX(articles.updated_at) AS last
+     FROM article_tags t JOIN articles ON articles.slug = t.slug
+     WHERE ${INDEXABLE_SQL}
+     GROUP BY t.tag HAVING COUNT(*) >= ${MIN_TAG_ARTICLES} ORDER BY last DESC`,
   );
 
   const entries: string[] = [];
@@ -522,7 +534,7 @@ app.get("/sitemap-news.xml", (c) => {
   const cutoff = new Date(Date.now() - 48 * 3600_000).toISOString();
   const articles = query<SitemapArticle>(
     `SELECT slug, title_ko, published_at, updated_at FROM articles
-     WHERE datetime(published_at) >= datetime(?)
+     WHERE datetime(published_at) >= datetime(?) AND ${INDEXABLE_SQL}
      ORDER BY published_at DESC LIMIT 1000`,
     [cutoff],
   );

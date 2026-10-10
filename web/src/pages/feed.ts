@@ -93,6 +93,8 @@ export function feedPage(options: {
   tag: string;
   page: number;
   total: number;
+  /** robots meta. 얇은 태그 페이지는 NOINDEX. */
+  robots?: string;
   origin?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(options.total / PAGE_SIZE));
@@ -148,6 +150,7 @@ export function feedPage(options: {
     current: "feed",
     activeTag: options.tag,
     canonical: feedHref(options.tag, options.page),
+    robots: options.robots,
     origin: options.origin,
     ogType: "website",
     jsonLd,

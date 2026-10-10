@@ -149,6 +149,8 @@ export function articlePage(options: {
   origin?: string;
   related?: RelatedRow[];
   notice?: string;
+  /** robots meta. 색인 기준 밖 기사는 NOINDEX. */
+  robots?: string;
 }) {
   const article = options.article;
   const path = `/s/${encodeURIComponent(article.slug)}`;
@@ -159,6 +161,7 @@ export function articlePage(options: {
     title: `${article.title_ko} · ${SITE_NAME}`,
     description,
     canonical: path,
+    robots: options.robots,
     origin: options.origin,
     ogType: "article",
     ogImage,

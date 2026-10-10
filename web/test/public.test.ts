@@ -19,6 +19,7 @@ beforeAll(() => {
         role: "primary",
         comments: [{ author: "neogaf_user", text: "부스가 정말 컸다" }],
       },
+      { name: "4Gamer", url: "https://example.com/4gamer", role: "support" },
     ],
   });
   insertArticle({
@@ -26,7 +27,12 @@ beforeAll(() => {
     title: "인디 게임 정식 출시",
     body: "<p>오늘 정식 출시되었다.</p>",
     tags: ["출시·패치"],
+    sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }],
   });
+  // 태그 페이지가 색인 기준(색인 기사 3건 이상)을 넘도록 같은 태그의 풍부한 기사를 더 둔다.
+  for (const n of [1, 2, 3]) {
+    insertArticle({ slug: `rich-${n}`, tags: ["색인태그"], sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }] });
+  }
 });
 
 afterAll(() => cleanup());
@@ -99,16 +105,17 @@ describe("공개 읽기", () => {
     expect(xml).toContain("<loc>http://localhost/s/indie-ship</loc>");
     expect(xml).toContain("<lastmod>");
     expect(xml).toContain("<image:loc>http://localhost/og/s/tgs-2026-report.png</image:loc>");
-    expect(xml).toContain("<loc>http://localhost/?tag=");
+    expect(xml).toContain("<loc>http://localhost/?tag=%EC%83%89%EC%9D%B8%ED%83%9C%EA%B7%B8</loc>");
   });
 
   it("sitemap-news.xml은 최근 48시간 기사만 담는다", async () => {
     const now = new Date().toISOString();
-    insertArticle({ slug: "fresh-news", title: "방금 나온 소식", publishedAt: now });
+    insertArticle({ slug: "fresh-news", title: "방금 나온 소식", publishedAt: now, sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }] });
     insertArticle({
       slug: "stale-news",
       title: "오래된 소식",
       publishedAt: new Date(Date.now() - 5 * 24 * 3600_000).toISOString(),
+      sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }],
     });
     const res = await app.request("/sitemap-news.xml");
     expect(res.status).toBe(200);
