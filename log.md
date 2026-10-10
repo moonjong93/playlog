@@ -47,3 +47,4 @@
 2026-10-10 13:28:08 | ISSUE=web | 할인 가격 이력 수집: price_history 테이블(마이그레이션 v5), 수집 때마다 가격이 바뀐 경우만 한 줄 추가·할인 종료 시 정가(0%)로 기록. UI(/deals/:appId 가격 그래프 + 목록 '수집 이후 최저가' 배지)는 구현해 두고 DEALS_PRICE_UI=1 일 때만 노출(기본 꺼짐, 꺼지면 상세 404). 켜려면 서버 .env에 DEALS_PRICE_UI=1 후 news-web 재생성. 테스트 129 통과, 복사본 DB로 그래프 화면 확인
 2026-10-10 13:31:41 | ISSUE=web | 헤더 개편: 상단 메뉴의 #최근태그 5개·'전체보기' 링크 제거(메뉴는 '할인'만), 우측 검색 옆에 태그 아이콘(sell, /tags 이동, 태그 페이지에선 활성 표시) 추가. nav aria-label 태그→메뉴. 관련 테스트 2건 교체, tsc + 128 통과, 로컬 확인(미배포)
 2026-10-10 13:52:44 | ISSUE=web | 헤더 메뉴 링크 높이 고정: 비활성 링크에도 border-b-2 border-transparent 를 줘 활성 밑줄 때문에 글자가 2px 밀리던 현상 제거(활성/비활성 top 7·height 42 동일 확인). 128 테스트·tsc 통과(미배포)
+2026-10-10 13:55:12 | ISSUE=infra | 배포: c2a6d07·67babfd·e1cc419 푸시 → app LXC(.102) deploy.sh(news-web 재빌드·서비스 재시작). 공개 스모크 news.nevra.app / /deals /tags /sitemap.xml 200, 헤더 태그 아이콘(aria-label 전체 태그)·메뉴 확인, #태그 메뉴 제거 확인. 가격 이력(price_history v5) 수집 시작, 그래프 UI는 DEALS_PRICE_UI 미설정으로 숨김 유지
