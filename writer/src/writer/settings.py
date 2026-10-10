@@ -119,7 +119,7 @@ def load_settings() -> Settings:
         editor_model=editor_model,
         bench_models=_str(
             "BENCH_MODELS",
-            "inclusionai/ling-3.0-flash,deepseek/deepseek-v4-flash,"
+            "anthropic/claude-haiku-5.5,inclusionai/ling-3.0-flash,"
             "google/gemma-4-26b-a4b-it,google/gemma-4-31b-it,"
             "upstage/solar-pro4,google/gemini-2.5-flash-lite,openai/gpt-5.6-luna",
         ),

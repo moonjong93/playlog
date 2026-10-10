@@ -64,11 +64,12 @@ def test_find_cjk_leaks_excludes_hangul():
 
 def test_parse_models_dedupes():
     assert parse_models("a, b, a") == ["a", "b"]
-    assert parse_models("")[0] == "inclusionai/ling-3.0-flash"
+    assert parse_models("")[0] == "anthropic/claude-haiku-5.5"
 
 
 def test_default_models_include_gemma_and_luna():
     names = parse_models("")
+    assert not any("deepseek" in n for n in names)
     assert "google/gemma-4-26b-a4b-it" in names
     assert "openai/gpt-5.6-luna" in names
 

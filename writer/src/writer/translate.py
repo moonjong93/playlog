@@ -45,7 +45,7 @@ def _is_korean_only(text: str) -> bool:
 def _parse_array(text: str) -> list:
     """첫 번째 JSON 배열만 집는다.
 
-    모델이 배열 뒤에 해설을 붙이거나 배열을 반복해도(실측: deepseek-v4-flash-0731)
+    모델이 배열 뒤에 해설을 붙이거나 배열을 반복해도(실측: 일부 모델)
     첫 배열만 읽으면 되므로 raw_decode 로 정확히 잘라낸다.
     """
     raw = _FENCE.sub("", (text or "").strip()).strip()

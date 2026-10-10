@@ -23,8 +23,8 @@ from .vec import centroid as _centroid
 log = logging.getLogger(__name__)
 
 DEFAULT_MODELS = (
+    "anthropic/claude-haiku-5.5",
     "inclusionai/ling-3.0-flash",
-    "deepseek/deepseek-v4-flash",
     "google/gemma-4-26b-a4b-it",
     "google/gemma-4-31b-it",
     "upstage/solar-pro4",

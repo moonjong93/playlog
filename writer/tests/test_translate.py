@@ -162,7 +162,7 @@ def test_translate_empty_input_makes_no_call():
 
 
 def test_parse_array_takes_first_array_when_model_adds_commentary():
-    """실측(deepseek-v4-flash-0731): 배열 + 해설 + 배열 반복. 첫 배열만 읽는다."""
+    """실측(일부 모델): 배열 + 해설 + 배열 반복. 첫 배열만 읽는다."""
     from writer.translate import _parse_array
 
     text = (

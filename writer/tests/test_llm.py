@@ -178,7 +178,7 @@ def test_provider_order_pins_routing():
         return _ok({"title_ko": "T", "lede_ko": "L", "body_md": "B"})
 
     _chat(handler, provider_order="deepinfra, relace").complete(
-        model="deepseek/deepseek-v4-flash-0731", system="s", user="u",
+        model="anthropic/claude-haiku-5.5", system="s", user="u",
         temperature=0.2, max_tokens=100,
     )
     assert seen["body"]["provider"] == {"order": ["deepinfra", "relace"], "allow_fallbacks": True}

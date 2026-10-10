@@ -99,7 +99,7 @@ uv run writer bench show --run-id 6
 기본 모델은 `.env` 의 `BENCH_MODELS` (쉼표 구분):
 
 ```
-BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai/gpt-5.6-luna,google/gemma-4-31b-it,upstage/solar-pro4
+BENCH_MODELS=anthropic/claude-haiku-5.5,openai/gpt-5.6-luna,google/gemma-4-31b-it,upstage/solar-pro4
 ```
 
 기본 모델은 `WRITER_MODEL=anthropic/claude-haiku-5.5`, `WRITER_REASONING=low`다. 게임 단신은 고급 추론보다 원문 충실도와 자연스러운 한국어가 우선이다. 모델이나 provider를 바꿀 때는 소량 벤치 후 발행한다.
@@ -109,7 +109,7 @@ BENCH_MODELS=deepseek/deepseek-v4-flash-0731,deepseek/deepseek-v4.1-flash,openai
 - `WRITER_REASONING=low` — writer와 댓글 번역에 함께 적용한다. `high`는 reasoning 토큰을 크게 늘릴 수 있고, reasoning만 출력한 빈 응답도 생성 토큰만큼 과금된다.
 - `WRITER_MAX_TOKENS=16000` — 출력 상한이며 상한 전체가 바로 청구되지는 않는다. 다만 잔액이 작을 때는 OpenRouter가 이 상한으로 요청 비용을 사전 추정해 402로 거절할 수 있다.
 - `WRITER_MAX_PER_RUN=20` — writer 한 주기에서 시도할 스토리 수 상한. 넘는 clustered 스토리는 대기열에 남겨 다음 주기에 처리한다. `0`이면 제한이 없다.
-- `WRITER_PROVIDER_ORDER` — 비우면 OpenRouter 기본 라우팅을 사용한다. 특정 provider를 지정하려면 해당 모델에서 가격과 fallback 동작을 먼저 검증한다. DeepSeek에서 DeepInfra가 429를 반환해 Relace로 fallback한 사례가 있었다.
+- `WRITER_PROVIDER_ORDER` — 비우면 OpenRouter 기본 라우팅을 사용한다. 특정 provider를 지정하려면 해당 모델에서 가격과 fallback 동작을 먼저 검증한다.
 
 리포트 요약에 `한자누출`(한자·가나가 섞인 출력 건수)과 `원제누락`(로마자 원제를 안 쓴 건수)이 플래그로 붙는다. **출력은 고치지 않고 표시만** 한다. `write` 태스크는 요약(lede)도 같이 보여준다.
 
