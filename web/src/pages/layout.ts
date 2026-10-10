@@ -223,7 +223,7 @@ function navLink(
 ) {
   const cls = active
     ? "border-b-2 border-primary text-on-surface font-semibold py-3 transition-colors text-label-ui font-label-ui"
-    : "text-on-surface-variant hover:text-on-surface py-3 transition-colors text-label-ui font-label-ui";
+    : "border-b-2 border-transparent text-on-surface-variant hover:text-on-surface py-3 transition-colors text-label-ui font-label-ui";
   return html`<a class="${cls} ${extra}" href="${href}">${label}</a>`;
 }
 
