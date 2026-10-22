@@ -45,6 +45,8 @@ services:
       SITE_URL: ${SITE_URL:-https://news.nevra.app}
       COOKIE_SECURE: "1"
       RATE_LIMIT_DISABLED: "0"
+      # /internal/seo 대시보드 브라우저 접근용(선택). 비우면 Bearer 키만 허용.
+      SEO_DASH_TOKEN: ${SEO_DASH_TOKEN:-}
     networks: [edge]
 
   # 두 번째 공개 서비스 템플릿. 이미지가 준비되면 주석을 풀고

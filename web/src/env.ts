@@ -47,6 +47,8 @@ export const env = {
   googleSiteVerification: process.env.GOOGLE_SITE_VERIFICATION?.trim() || "",
   naverSiteVerification: process.env.NAVER_SITE_VERIFICATION?.trim() || "",
   bingSiteVerification: process.env.BING_SITE_VERIFICATION?.trim() || "",
+  /** /internal/seo 대시보드를 브라우저에서 열 때 쓰는 토큰(선택). 없으면 Bearer 키만 허용. */
+  seoDashToken: process.env.SEO_DASH_TOKEN?.trim() || "",
 };
 
 /** 부하 테스트용 스위치. 테스트에서 런타임에 토글할 수 있게 매번 읽는다. */

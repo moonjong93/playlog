@@ -63,6 +63,8 @@ import { type ArticleRow } from "./pages/layout.ts";
 import { logoPng, logoSvg, manifestJson } from "./brand.ts";
 import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
 import { INDEXABLE_SQL, MIN_TAG_ARTICLES, isArticleIndexable, isTagIndexable } from "./indexing.ts";
+import { recordSeoSnapshot, seoHistory, seoReport } from "./seoMonitor.ts";
+import { seoStatusPage } from "./pages/seoStatus.ts";
 import { NOINDEX, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "./site.ts";
 
 type AppEnv = { Variables: { ip: string; sid: string } };
@@ -329,7 +331,8 @@ app.get("/", (c) => {
       tag,
       page,
       total,
-      robots: tag && !isTagIndexable(tag) ? NOINDEX : undefined,
+      // 2페이지부터는 목록 중복이라 noindex. 기사는 각자 URL·사이트맵으로 노출된다.
+      robots: (tag && !isTagIndexable(tag)) || page > 1 ? NOINDEX : undefined,
       origin: originOf(c),
     }),
   );
@@ -344,6 +347,8 @@ app.get("/tags", (c) => {
       page,
       total: tagTotal(),
       activeTag: (c.req.query("tag") ?? "").trim(),
+      // 태그 목록도 2페이지부터는 같은 목록의 중복이다.
+      robots: page > 1 ? NOINDEX : undefined,
       origin: originOf(c),
     }),
   );
@@ -793,6 +798,32 @@ app.post("/comments/:id/delete", (c) => {
     html`${commentTombstone(id)}${commentCount(commentTotal(row.slug))}`,
     200,
   );
+});
+
+/** /internal/seo 대시보드 인증: Bearer 키 또는 ?token=(SEO_DASH_TOKEN). */
+function seoDashOk(c: Context): boolean {
+  if (bearerOk(c)) return true;
+  const expected = env.seoDashToken;
+  const given = c.req.query("token") ?? "";
+  if (!expected || !given) return false;
+  const a = createHash("sha256").update(given).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+// /internal/* Bearer 미들웨어보다 먼저 등록해야 자체 인증(?token=)이 먹는다.
+app.get("/internal/seo", (c) => {
+  if (!seoDashOk(c)) return c.text("unauthorized", 401);
+  const report = seoReport();
+  recordSeoSnapshot(report.stats);
+  return c.html(seoStatusPage({ report, history: seoHistory(30), origin: originOf(c) }));
+});
+
+app.get("/internal/seo.json", (c) => {
+  if (!seoDashOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const report = seoReport();
+  const recorded = recordSeoSnapshot(report.stats);
+  return c.json({ ...report, snapshotRecorded: recorded, history: seoHistory(30) });
 });
 
 app.use("/internal/*", async (c, next) => {

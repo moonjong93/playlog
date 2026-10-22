@@ -6,6 +6,13 @@ import { app, cleanup, insertArticle } from "./helpers.ts";
 // npm run assets를 아직 안 돌렸으면 이 케이스만 건너뛴다.
 const hasHtmxAsset = existsSync(join(import.meta.dirname, "../dist/htmx.min.js"));
 
+/** 색인 기준(MIN_SOURCES=3)을 넘기는 기본 출처 묶음. */
+const S3 = [
+  { name: "A", url: "https://example.com/a", role: "primary" },
+  { name: "B", url: "https://example.com/b", role: "support" },
+  { name: "C", url: "https://example.com/c", role: "support" },
+];
+
 beforeAll(() => {
   insertArticle({
     slug: "tgs-2026-report",
@@ -20,6 +27,7 @@ beforeAll(() => {
         comments: [{ author: "neogaf_user", text: "부스가 정말 컸다" }],
       },
       { name: "4Gamer", url: "https://example.com/4gamer", role: "support" },
+      { name: "Automaton", url: "https://example.com/automaton", role: "support" },
     ],
   });
   insertArticle({
@@ -27,11 +35,11 @@ beforeAll(() => {
     title: "인디 게임 정식 출시",
     body: "<p>오늘 정식 출시되었다.</p>",
     tags: ["출시·패치"],
-    sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }],
+    sources: S3,
   });
-  // 태그 페이지가 색인 기준(색인 기사 3건 이상)을 넘도록 같은 태그의 풍부한 기사를 더 둔다.
-  for (const n of [1, 2, 3]) {
-    insertArticle({ slug: `rich-${n}`, tags: ["색인태그"], sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }] });
+  // 태그 페이지가 색인 기준(색인 기사 8건 이상)을 넘도록 같은 태그의 풍부한 기사를 더 둔다.
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    insertArticle({ slug: `rich-${n}`, tags: ["색인태그"], sources: S3 });
   }
 });
 
@@ -110,12 +118,12 @@ describe("공개 읽기", () => {
 
   it("sitemap-news.xml은 최근 48시간 기사만 담는다", async () => {
     const now = new Date().toISOString();
-    insertArticle({ slug: "fresh-news", title: "방금 나온 소식", publishedAt: now, sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }] });
+    insertArticle({ slug: "fresh-news", title: "방금 나온 소식", publishedAt: now, sources: S3 });
     insertArticle({
       slug: "stale-news",
       title: "오래된 소식",
       publishedAt: new Date(Date.now() - 5 * 24 * 3600_000).toISOString(),
-      sources: [{ name: "A", url: "https://example.com/a", role: "primary" }, { name: "B", url: "https://example.com/b", role: "support" }],
+      sources: S3,
     });
     const res = await app.request("/sitemap-news.xml");
     expect(res.status).toBe(200);
@@ -144,6 +152,7 @@ describe("공개 읽기", () => {
       slug: "brand-fresh",
       title: "브랜드 확인용 기사",
       publishedAt: new Date().toISOString(),
+      sources: S3,
     });
 
     const home = await (await app.request("/")).text();

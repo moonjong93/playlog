@@ -7,6 +7,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "news-web-test-"));
 process.env.WEB_DB = join(tempDir, "web.db");
 process.env.SESSION_SECRET ??= "test-session-secret";
 process.env.WEB_API_KEY ??= "test-api-key";
+process.env.SEO_DASH_TOKEN ??= "test-seo-token";
 delete process.env.TRUST_PROXY;
 delete process.env.SITE_URL;
 

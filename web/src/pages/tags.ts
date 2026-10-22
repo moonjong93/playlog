@@ -15,6 +15,8 @@ export function tagsPage(options: {
   page: number;
   total: number;
   activeTag: string;
+  /** 2페이지부터는 목록 중복이라 noindex. */
+  robots?: string;
   origin?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(options.total / TAGS_PAGE_SIZE));
@@ -59,6 +61,7 @@ export function tagsPage(options: {
     current: "tags",
     activeTag: options.activeTag,
     canonical: tagsHref(options.page),
+    robots: options.robots,
     origin: options.origin,
     prevPath: options.page > 1 ? tagsHref(options.page - 1) : undefined,
     nextPath: options.page < totalPages ? tagsHref(options.page + 1) : undefined,

@@ -106,6 +106,19 @@ CREATE TABLE IF NOT EXISTS price_history (
 CREATE INDEX IF NOT EXISTS idx_price_history_app ON price_history(app_id, recorded_at);
 `;
 
+/** v6: SEO 관측 스냅샷. 대시보드가 주기적으로 한 줄씩 남겨 추이를 본다. */
+const V6 = `
+CREATE TABLE IF NOT EXISTS seo_snapshots (
+  taken_at TEXT PRIMARY KEY,
+  total_articles INTEGER NOT NULL,
+  indexable_articles INTEGER NOT NULL,
+  thin_articles INTEGER NOT NULL,
+  single_source_articles INTEGER NOT NULL,
+  indexable_tags INTEGER NOT NULL,
+  sitemap_urls INTEGER NOT NULL
+);
+`;
+
 export const migrations: Migration[] = [
   { version: 1, up: (db) => db.exec(V1) },
   {
@@ -118,6 +131,7 @@ export const migrations: Migration[] = [
   { version: 3, up: (db) => db.exec(V3) },
   { version: 4, up: (db) => db.exec(V4) },
   { version: 5, up: (db) => db.exec(V5) },
+  { version: 6, up: (db) => db.exec(V6) },
 ];
 
 /** PRAGMA user_version 기준으로 미적용 마이그레이션만 순서대로 실행한다. */
