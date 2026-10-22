@@ -63,7 +63,7 @@ import { type ArticleRow } from "./pages/layout.ts";
 import { logoPng, logoSvg, manifestJson } from "./brand.ts";
 import { DEFAULT_OG_KEY, articleOgCard, defaultOgCard, ogPng } from "./og.ts";
 import { INDEXABLE_SQL, MIN_TAG_ARTICLES, isArticleIndexable, isTagIndexable } from "./indexing.ts";
-import { recordSeoSnapshot, seoHistory, seoReport } from "./seoMonitor.ts";
+import { recordSeoSnapshot, seoCheckpoints, seoHistory, seoReport } from "./seoMonitor.ts";
 import { seoStatusPage } from "./pages/seoStatus.ts";
 import { NOINDEX, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "./site.ts";
 
@@ -816,14 +816,26 @@ app.get("/internal/seo", (c) => {
   if (!seoDashOk(c)) return c.text("unauthorized", 401);
   const report = seoReport();
   recordSeoSnapshot(report.stats);
-  return c.html(seoStatusPage({ report, history: seoHistory(30), origin: originOf(c) }));
+  return c.html(
+    seoStatusPage({
+      report,
+      history: seoHistory(30),
+      checkpoints: seoCheckpoints(),
+      origin: originOf(c),
+    }),
+  );
 });
 
 app.get("/internal/seo.json", (c) => {
   if (!seoDashOk(c)) return c.json({ error: "unauthorized" }, 401);
   const report = seoReport();
   const recorded = recordSeoSnapshot(report.stats);
-  return c.json({ ...report, snapshotRecorded: recorded, history: seoHistory(30) });
+  return c.json({
+    ...report,
+    checkpoints: seoCheckpoints(),
+    snapshotRecorded: recorded,
+    history: seoHistory(30),
+  });
 });
 
 app.use("/internal/*", async (c, next) => {

@@ -73,6 +73,31 @@ describe("/internal/seo 관측 대시보드", () => {
     expect(Array.isArray(body.history)).toBe(true);
   });
 
+  it("짧은 브리핑·단일 출처는 설계라 '참고'로 두고 판정에 넣지 않는다", async () => {
+    const body = await (await get("/internal/seo.json")).json() as {
+      checks: { id: string; status: string }[];
+    };
+    const byId = new Map(body.checks.map((check) => [check.id, check.status]));
+    expect(byId.get("body-depth")).toBe("info");
+    expect(byId.get("sources")).toBe("info");
+    // 볼륨·사이트맵 같은 조치 대상만 판정에 반영된다.
+    expect(["ok", "warn", "bad"]).toEqual(
+      expect.arrayContaining([byId.get("volume") as string].filter((s) =>
+        ["ok", "warn", "bad"].includes(s)
+      )),
+    );
+  });
+
+  it("관찰 계획은 D+14·30·60 시점과 기준일을 준다", async () => {
+    const body = await (await get("/internal/seo.json")).json() as {
+      checkpoints: { day: number; date: string; reached: boolean }[];
+    };
+    expect(body.checkpoints.map((c) => c.day)).toEqual([14, 30, 60]);
+    expect(body.checkpoints[0].date).toBe("2026-11-05");
+    expect(body.checkpoints[2].date).toBe("2026-12-21");
+    expect(body.checkpoints.every((c) => typeof c.reached === "boolean")).toBe(true);
+  });
+
   it("스냅샷은 6시간에 한 번만 쌓인다", async () => {
     const first = await (await get("/internal/seo.json")).json() as { snapshotRecorded: boolean };
     const second = await (await get("/internal/seo.json")).json() as { snapshotRecorded: boolean };

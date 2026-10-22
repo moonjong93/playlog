@@ -1,5 +1,5 @@
 import { html } from "hono/html";
-import type { SeoCheck, SeoReport, SeoSnapshot } from "../seoMonitor.ts";
+import type { SeoCheck, SeoCheckpoint, SeoReport, SeoSnapshot } from "../seoMonitor.ts";
 import { SITE_NAME, NOINDEX } from "../site.ts";
 import { formatTime, layout, type Html } from "./layout.ts";
 
@@ -23,6 +23,12 @@ const STATUS_STYLE: Record<
     label: "주의",
   },
   bad: { text: "text-error", bg: "bg-error-container", border: "border-l-error", label: "개선 필요" },
+  info: {
+    text: "text-on-surface-variant",
+    bg: "bg-surface-container",
+    border: "border-l-outline",
+    label: "참고",
+  },
 };
 
 function card(label: string, value: string, note: string, tone = "text-on-surface"): Html {
@@ -98,7 +104,30 @@ function historyTable(rows: SeoSnapshot[]): Html {
   </div>`;
 }
 
-export function seoStatusPage(options: { report: SeoReport; history: SeoSnapshot[]; origin?: string }) {
+function checkpointTable(rows: (SeoCheckpoint & { reached: boolean })[]): Html {
+  const cells = rows.map(
+    (row) => html`<tr class="align-top">
+      <td class="py-2 pr-3 whitespace-nowrap text-label-mono-sm font-label-mono-sm ${row.reached ? "text-primary" : "text-outline"}">
+        D+${row.day}<span class="block text-outline">${row.date}</span>
+      </td>
+      <td class="py-2 pr-3 text-body-sm font-body-sm text-on-surface-variant">
+        <span class="block text-on-surface">${row.watch}</span>
+        <span class="block text-primary">기대: ${row.target}</span>
+        <span class="block text-outline">못 넘으면: ${row.fallback}</span>
+      </td>
+    </tr>`,
+  );
+  return html`<div class="overflow-x-auto">
+    <table class="w-full border-collapse"><tbody>${cells}</tbody></table>
+  </div>`;
+}
+
+export function seoStatusPage(options: {
+  report: SeoReport;
+  history: SeoSnapshot[];
+  checkpoints: (SeoCheckpoint & { reached: boolean })[];
+  origin?: string;
+}) {
   const { report } = options;
   const a = report.stats.articles;
   const s = report.stats.sitemap;
@@ -139,8 +168,8 @@ export function seoStatusPage(options: { report: SeoReport; history: SeoSnapshot
         ${card("색인 대상", String(a.indexable), `전체의 ${a.total ? Math.round((a.indexable / a.total) * 1000) / 10 : 0}%`, "text-primary")}
         ${card("noindex", String(a.excluded), "사용자에게만 노출")}
         ${card("사이트맵 URL", String(s.total), `기사 ${s.articles} · 태그 ${s.tags} · 고정 ${s.fixed}`)}
-        ${card("본문 500자 미만", String(a.body.under500), "Google 이 얇게 보는 글")}
-        ${card(`출처 ${report.stats.thresholds.minSources}개 미만`, String(a.fewSources), "단일 매체 의존")}
+        ${card("본문 500자 미만", String(a.body.under500), "짧은 브리핑 — 설계")}
+        ${card(`출처 ${report.stats.thresholds.minSources}개 미만`, String(a.fewSources), "여러 매체가 다룬 사건만 색인")}
         ${card("색인 태그 페이지", String(report.stats.tags.indexable), `전체 태그 ${report.stats.tags.total}개 중`)}
         ${card("하루 평균 발행", `${a.recent.perDay7d}편`, `최근 24시간 ${a.recent.last24h}편`)}
       </div>
@@ -161,6 +190,15 @@ export function seoStatusPage(options: { report: SeoReport; history: SeoSnapshot
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <h2 class="text-headline-sm font-headline-sm font-bold text-on-surface">관찰 계획</h2>
+        <p class="text-body-sm font-body-sm text-on-surface-variant">
+          신뢰가 0인 도메인은 지표를 고쳐서 색인을 앞당길 수 없다. 아래 시점에 Search Console
+          숫자를 보고 다음 수를 정한다.
+        </p>
+        ${checkpointTable(options.checkpoints)}
       </div>
 
       <div class="flex flex-col gap-3">

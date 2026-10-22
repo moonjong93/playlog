@@ -39,7 +39,8 @@ export type SeoStats = {
 export type SeoCheck = {
   id: string;
   label: string;
-  status: "ok" | "warn" | "bad";
+  /** info = 설계 선택이라 조치 대상이 아님(판정에 반영하지 않는다). */
+  status: "ok" | "warn" | "bad" | "info";
   detail: string;
   hint: string;
 };
@@ -180,19 +181,21 @@ export function evaluateSeo(stats: SeoStats): SeoReport {
   const thinRatio = pct(a.body.under500, a.total);
   checks.push({
     id: "body-depth",
-    label: "본문 500자 미만 비율",
-    status: thinRatio > 60 ? "bad" : thinRatio > 30 ? "warn" : "ok",
+    label: "짧은 브리핑 비율 (본문 500자 미만)",
+    // 짧은 브리핑은 이 서비스의 설계다. 길이가 아니라 노출 규모가 조치 대상이므로
+    // 참고값으로만 두고 판정에는 넣지 않는다.
+    status: "info",
     detail: `${thinRatio}% (${a.body.under500}편 / 전체 ${a.total}편)`,
-    hint: "Google 은 얇은 글을 사이트 단위로 평가한다. 30% 아래를 유지한다.",
+    hint: "설계상 짧은 요약이라 조치 대상이 아니다. 짧아도 색인은 된다.",
   });
 
   const fewRatio = pct(a.fewSources, a.total);
   checks.push({
     id: "sources",
-    label: `출처 ${MIN_SOURCES}개 미만 비율`,
-    status: fewRatio > 60 ? "bad" : fewRatio > 40 ? "warn" : "ok",
+    label: `단일 출처 기사 비율 (출처 ${MIN_SOURCES}개 미만)`,
+    status: "info",
     detail: `${fewRatio}% (${a.fewSources}편)`,
-    hint: "여러 매체가 다룬 사건일수록 원문 대비 고유 가치가 생긴다.",
+    hint: "여러 매체가 다룬 사건일수록 원문 대비 고유 가치가 커진다. 참고값.",
   });
 
   checks.push({
@@ -200,7 +203,7 @@ export function evaluateSeo(stats: SeoStats): SeoReport {
     label: "발행 속도 (최근 7일 하루 평균)",
     status: a.recent.perDay7d > 50 ? "bad" : a.recent.perDay7d > 20 ? "warn" : "ok",
     detail: `${a.recent.perDay7d}편/일 · 최근 24시간 ${a.recent.last24h}편`,
-    hint: "신뢰가 낮은 도메인에서 하루 수십 편은 대량 생성 신호로 읽힌다.",
+    hint: "막 생긴 도메인이 하루 수십 편을 쏟으면 '대량 생성'으로 읽힌다. 20편 아래 유지.",
   });
 
   checks.push({
@@ -274,4 +277,58 @@ export function seoHistory(limit = 20): SeoSnapshot[] {
     "SELECT * FROM seo_snapshots ORDER BY taken_at DESC LIMIT ?",
     [limit],
   );
+}
+
+/**
+ * 관찰 계획.
+ *
+ * 신뢰가 0인 도메인은 지표를 고쳐서 색인을 앞당길 수 없다. 대신 "언제까지
+ * 무엇을 보면 판단이 서는지"를 정해 두고, 그 시점에 다음 수를 결정한다.
+ */
+export const SEO_BASELINE = "2026-10-22";
+
+export type SeoCheckpoint = {
+  /** 기준일로부터 지난 일수. */
+  day: number;
+  date: string;
+  /** 이 시점에 볼 것. */
+  watch: string;
+  /** 기대선. */
+  target: string;
+  /** 못 넘었을 때 할 일. */
+  fallback: string;
+  reached: boolean;
+};
+
+const CHECKPOINT_PLANS = [
+  {
+    day: 14,
+    watch: "Search Console → 페이지 → 색인 생성됨",
+    target: "1개 이상이면 정상 궤도(첫 색인이 가장 어렵다)",
+    fallback: "0개면 게임 커뮤니티에 링크 1~2개를 직접 만든다",
+  },
+  {
+    day: 30,
+    watch: "색인 생성됨 수 / 발견됨·색인 안 됨 추이",
+    target: "색인 10개 이상, 발견됨이 300 아래로 감소",
+    fallback: "0~2개면 대기만으로는 안 된다 → 링크·브랜드가 필수",
+  },
+  {
+    day: 60,
+    watch: "색인 생성됨 수",
+    target: "색인 50개 이상이면 게이트를 풀어 노출을 넓힌다",
+    fallback: "< 10개면 콘텐츠 신뢰 구조(원본성·운영 주체)를 다시 설계",
+  },
+];
+
+export function seoCheckpoints(today = new Date()): SeoCheckpoint[] {
+  const base = new Date(`${SEO_BASELINE}T00:00:00Z`).getTime();
+  return CHECKPOINT_PLANS.map((plan) => {
+    const at = new Date(base + plan.day * 86_400_000);
+    return {
+      ...plan,
+      date: at.toISOString().slice(0, 10),
+      reached: today.getTime() >= at.getTime(),
+    };
+  });
 }
