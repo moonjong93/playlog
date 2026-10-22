@@ -20,7 +20,10 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    # 전송을 HTTP/2(TCP 7844)로 고정한다. 기본값인 QUIC(UDP 7844)은 이 회선에서
+    # 몇 분마다 4개 연결이 동시에 "no recent network activity"로 끊겨
+    # 재연결하는 동안 Cloudflare 가 502 를 반환했다(2026-10-12 부터 상시화).
+    command: tunnel --no-autoupdate --protocol http2 run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?루트 .env 에 CLOUDFLARE_TUNNEL_TOKEN 를 설정하세요}
     networks: [edge]
