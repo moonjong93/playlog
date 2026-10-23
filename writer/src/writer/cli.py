@@ -209,7 +209,10 @@ def cmd_bench_run(args) -> int:
     s = load_settings()
     conn = _open(s)
     models = parse_models(args.models, s.bench_models)
-    chat = _chat(s, reasoning_effort="none", exclude_reasoning=True)
+    # 기본은 추론 끔(기존 동작). --reasoning 을 주면 경합하는 모든 모델에 같은 effort 를 건다.
+    effort = (getattr(args, "reasoning", None) or "none").strip().lower()
+    log.info("bench reasoning=%s models=%s", effort, ",".join(models))
+    chat = _chat(s, reasoning_effort=effort, exclude_reasoning=True)
     try:
         stats = run_bench(
             conn, s, chat,
@@ -358,6 +361,9 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--task", choices=("translate", "write"), default="translate",
                        help="translate=최근 RSS 번역, write=기존 스토리 팩으로 단신")
         p.add_argument("--models", help="없으면 .env BENCH_MODELS")
+        p.add_argument("--reasoning", default=None,
+                       help="추론 effort(none|low|medium|high|max). 경합 모델 전부에 같은 값. "
+                            "미지정 시 none(기존). 운영과 맞추려면 low")
         p.add_argument("--limit", type=int, default=None,
                        help="run: 케이스 수 (기본 6). show --list: 런 수 (기본 20)")
         p.add_argument("--hours", type=int, default=48)
